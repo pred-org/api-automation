@@ -1,0 +1,23 @@
+{
+  "MARKET_ID": "0xfaa8c7e1fd82aa80aae5c8859c2bb54e01e69badd720605dff89494dd974b400",
+  "MARKET_ID_PATH": null,
+  "TOKEN_ID": "0x1234567890abcdef1234567890abcdef12345678",
+  "users": [
+    {
+      "id": "user1",
+      "userIndex": 0,
+      "accessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6InVhdC1rZXktMiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNGYyZWRiNWItMDg5MC00YTdkLTlhODctM2FlZDQ5NTQ3MjBmIiwidG9rZW5fdHlwZSI6ImFjY2VzcyIsInNlc3Npb25faWQiOiI5NDY2ZWQ3Ny00ZGU5LTRkOTQtOGVjMS0yODkxYjhmZmI5YWEiLCJyb2xlIjoiTUFSS0VUX01BS0VSIiwiaXNfZW5hYmxlZF90cmFkaW5nIjpmYWxzZSwiaXNzIjoiaHR0cHM6Ly91YXQtZnJhbmtmdXJ0LnByZWQuYXBwL2F1dGgiLCJzdWIiOiI0ZjJlZGI1Yi0wODkwLTRhN2QtOWE4Ny0zYWVkNDk1NDcyMGYiLCJhdWQiOlsiYXV0aCJdLCJleHAiOjE3NzE1MzcyOTAsIm5iZiI6MTc3MTUzMzY5MCwiaWF0IjoxNzcxNTMzNjkwfQ.cds4b2moOyPcsQFPhXpx7wTQZEOp06bLd_jnYGzF95H6-xlhDA9-C5_zD8_O4cRU5jBxtXghffkx52fDNDJhQ-yLYdithken36Ymwufml_scF-xqY-h4Z-f0-EcD935h3qwu-C5ICCBeyPCGB6lYb-NCe3as10yD9jmwsf7GJ0XTc2IQesdy21VJOGJUVZe9E4vc1ShbzbkflsE7Zequk_wSbg4Wuyr29bK_1NsowbSS939xhraEeqC92cGkaoiB2blc_PfsSeZWQNa174zADr2LqguL0eRVCMXzPuZ4jkjIcLev_Ltb5m7NbyQ21EjaEAPOewWfSL1Rslm1TxsVOw",
+      "proxy": "0xD93d73c24d1Ca1A3121c7632a245f0D8a881F871",
+      "eoa": "0x2D5a425b242eeA189DDa1740D92fA0D0Bb27b925",
+      "userId": "4f2edb5b-0890-4a7d-9a87-3aed4954720f",
+      "order": {
+        "intent": 0,
+        "side": "long",
+        "price": "30",
+        "quantity": "200",
+        "amount": "60",
+        "token_id": "0x1234567890abcdef1234567890abcdef12345678"
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="API Automation Suite" verbose="1">
+    <listeners>
+        <listener class-name="com.pred.apitests.listeners.TestListener"/>
+    </listeners>
+    <test name="API tests">
+        <classes>
+            <class name="com.pred.apitests.FrameworkSmokeTest"/>
+            <class name="com.pred.apitests.HealthCheckTest"/>
+            <class name="com.pred.apitests.LoginTest"/>
+        </classes>
+    </test>
+    <test name="Auth Flow">
+        <classes>
+            <class name="com.pred.apitests.test.AuthFlowTest"/>
+        </classes>
+    </test>
+    <test name="Enable Trading">
+        <classes>
+            <class name="com.pred.apitests.test.EnableTradingTest"/>
+        </classes>
+    </test>
+    <test name="Deposit">
+        <classes>
+            <class name="com.pred.apitests.test.DepositTest"/>
+        </classes>
+    </test>
+    <test name="Portfolio">
+        <classes>
+            <class name="com.pred.apitests.test.PortfolioTest"/>
+        </classes>
+    </test>
+    <test name="Order">
+        <classes>
+            <class name="com.pred.apitests.test.OrderTest"/>
+        </classes>
+    </test>
+</suite>
