@@ -12,6 +12,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 
 public class DepositTest extends BaseApiTest {
 
@@ -75,6 +76,11 @@ public class DepositTest extends BaseApiTest {
     public void depositWithInvalidUserId_returnsFailed() {
         Response response = depositService.internalDeposit("invalid-user-id-000", 1000000000L);
         assertThat(response.getStatusCode()).isEqualTo(200);
+        response.then().body("success", equalTo(false))
+                .body("message", equalTo("Failed to get user wallet address"))
+                .body("err_code", equalTo("WALLET_FETCH_FAILED"))
+                .body("user_id", equalTo("invalid-user-id-000"))
+                .body("amount", equalTo(1000000000));
         assertThat(response.jsonPath().getBoolean("success")).isFalse();
         assertThat(response.jsonPath().getString("err_code")).isEqualTo("WALLET_FETCH_FAILED");
     }

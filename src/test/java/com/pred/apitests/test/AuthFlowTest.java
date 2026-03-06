@@ -15,6 +15,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 public class AuthFlowTest extends BaseApiTest {
 
@@ -126,5 +128,9 @@ public class AuthFlowTest extends BaseApiTest {
         assertThat(response.getStatusCode())
                 .isGreaterThanOrEqualTo(400)
                 .isLessThan(500);
+        response.then().body("error", notNullValue())
+                .body("error.status_code", equalTo(401))
+                .body("error.error_code", equalTo("SIGNATURE_LOGIN_FAILED"))
+                .body("error.message", notNullValue());
     }
 }

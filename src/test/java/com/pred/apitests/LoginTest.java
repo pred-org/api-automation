@@ -9,6 +9,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 /**
  * Real login flow: create API key, login with invalid body (4xx), and optional valid login when credentials available.
@@ -39,6 +41,10 @@ public class LoginTest extends BaseApiTest {
                 .build();
         Response response = authService.login(apiKey, invalidBody);
         assertThat(response.getStatusCode()).isGreaterThanOrEqualTo(400).isLessThan(500);
+        response.then().body("error", notNullValue())
+                .body("error.status_code", equalTo(400))
+                .body("error.error_code", equalTo("BAD_REQUEST"))
+                .body("error.message", notNullValue());
     }
 
     private String getApiKeyForLogin() {

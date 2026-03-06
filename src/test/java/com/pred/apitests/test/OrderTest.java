@@ -16,6 +16,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 public class OrderTest extends BaseApiTest {
 
@@ -123,6 +125,10 @@ public class OrderTest extends BaseApiTest {
             System.out.println("DEBUG [place-order FAIL] status=" + status + " body=" + (body != null ? body : ""));
         }
         assertThat(status).isEqualTo(202);
+        response.then().body("status", equalTo("open_order"))
+                .body("order_id", notNullValue())
+                .body("message", equalTo("Order placed successfully"))
+                .body("filled_quantity", equalTo("0"));
     }
 
     @Test(description = "Cancel order with valid order_id and market_id returns 2xx")
@@ -139,6 +145,9 @@ public class OrderTest extends BaseApiTest {
 
         Response response = orderService.cancelOrder(token, cookie, marketId, orderId);
         assertThat(response.getStatusCode()).as("cancel order response").isBetween(200, 299);
+        response.then().body("status", equalTo("user_cancelled"))
+                .body("order_id", equalTo(orderId))
+                .body("message", equalTo("Order cancellation submitted successfully"));
         String body = response.getBody().asString();
         assertThat(body).as("cancel response body").contains("user_cancelled").contains("order_id");
     }
@@ -158,18 +167,33 @@ public class OrderTest extends BaseApiTest {
         if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
 
         // 1) Baseline: balance, earnings (PnL), positions
-        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+        Response balanceRes = portfolioService.getBalance(token, cookie);
+        assertThat(balanceRes.getStatusCode()).isEqualTo(200);
+        balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        long balanceBefore = Long.parseLong(balanceRes.path("usdc_balance").toString());
+        Response earningsRes = portfolioService.getEarnings(token, cookie);
+        assertThat(earningsRes.getStatusCode()).isEqualTo(200);
+        earningsRes.then().body("user_id", notNullValue()).body("realized_pnl", notNullValue()).body("unrealized_pnl", notNullValue()).body("total_pnl", notNullValue());
+        Response positionsRes = portfolioService.getPositions(token, cookie);
+        assertThat(positionsRes.getStatusCode()).isEqualTo(200);
+        positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
         // 2) Place order 1 (first signature)
         String orderId1 = placeOrderAndReturnOrderId(marketId, tokenId);
         assertThat(orderId1).as("place order 1 should return order_id in response").isNotBlank();
 
         // 3) After order 1: balance, earnings, positions
-        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+        balanceRes = portfolioService.getBalance(token, cookie);
+        assertThat(balanceRes.getStatusCode()).isEqualTo(200);
+        balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
+        long balanceAfterOrder1 = Long.parseLong(balanceRes.path("usdc_balance").toString());
+        assertThat(balanceAfterOrder1).isLessThanOrEqualTo(balanceBefore);
+        earningsRes = portfolioService.getEarnings(token, cookie);
+        assertThat(earningsRes.getStatusCode()).isEqualTo(200);
+        earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
+        positionsRes = portfolioService.getPositions(token, cookie);
+        assertThat(positionsRes.getStatusCode()).isEqualTo(200);
+        positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
         // 4) Place order 2 (different salt/timestamp -> different signature)
         String orderId2 = placeOrderAndReturnOrderId(marketId, tokenId);
@@ -177,18 +201,31 @@ public class OrderTest extends BaseApiTest {
         assertThat(orderId2).as("order 2 id should differ from order 1").isNotEqualTo(orderId1);
 
         // 5) After order 2: balance, earnings, positions
-        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+        balanceRes = portfolioService.getBalance(token, cookie);
+        assertThat(balanceRes.getStatusCode()).isEqualTo(200);
+        balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
+        earningsRes = portfolioService.getEarnings(token, cookie);
+        assertThat(earningsRes.getStatusCode()).isEqualTo(200);
+        earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
+        positionsRes = portfolioService.getPositions(token, cookie);
+        assertThat(positionsRes.getStatusCode()).isEqualTo(200);
+        positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
         // 6) Cancel order 2
         Response cancelResponse = orderService.cancelOrder(token, cookie, marketId, orderId2);
         assertThat(cancelResponse.getStatusCode()).as("cancel order 2").isBetween(200, 299);
+        cancelResponse.then().body("status", equalTo("user_cancelled")).body("order_id", equalTo(orderId2)).body("message", equalTo("Order cancellation submitted successfully"));
 
         // 7) After cancel: balance, earnings, positions (order 1 still open; position may appear if order 1 is matched later)
-        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
-        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+        balanceRes = portfolioService.getBalance(token, cookie);
+        assertThat(balanceRes.getStatusCode()).isEqualTo(200);
+        balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
+        earningsRes = portfolioService.getEarnings(token, cookie);
+        assertThat(earningsRes.getStatusCode()).isEqualTo(200);
+        earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
+        positionsRes = portfolioService.getPositions(token, cookie);
+        assertThat(positionsRes.getStatusCode()).isEqualTo(200);
+        positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
     }
 
     /**
@@ -242,6 +279,10 @@ public class OrderTest extends BaseApiTest {
 
         Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
         assertThat(response.getStatusCode()).as("place order").isEqualTo(202);
+        response.then().body("status", equalTo("open_order"))
+                .body("order_id", notNullValue())
+                .body("message", equalTo("Order placed successfully"))
+                .body("filled_quantity", notNullValue());
 
         // Response: { "status": "open_order", "order_id": "<uuid>", "message": "...", "filled_quantity": "0" }
         String orderId = response.jsonPath().getString("order_id");
@@ -276,6 +317,9 @@ public class OrderTest extends BaseApiTest {
 
         Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
         assertThat(response.getStatusCode()).isGreaterThanOrEqualTo(400);
+        response.then().body("error", notNullValue());
+        String responseBody = response.getBody().asString();
+        assertThat(responseBody).as("error response should mention signature").matches(s -> s.contains("signature") || s.contains("error_code"));
     }
 
     @Test(description = "Place order with balance check before and after; balance should reflect open order")
@@ -292,6 +336,8 @@ public class OrderTest extends BaseApiTest {
         Response balanceByMarketBefore = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(balanceOverallBefore.getStatusCode()).isEqualTo(200);
         assertThat(balanceByMarketBefore.getStatusCode()).isEqualTo(200);
+        balanceOverallBefore.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        balanceByMarketBefore.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
 
         BalanceResponse beforeOverall = balanceOverallBefore.as(BalanceResponse.class);
         BalanceResponse beforeByMarket = balanceByMarketBefore.as(BalanceResponse.class);
@@ -344,12 +390,23 @@ public class OrderTest extends BaseApiTest {
 
         Response orderResponse = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
         assertThat(orderResponse.getStatusCode()).isEqualTo(202);
+        orderResponse.then().body("status", equalTo("open_order"))
+                .body("order_id", notNullValue())
+                .body("message", equalTo("Order placed successfully"))
+                .body("filled_quantity", notNullValue());
 
         // 3) Balance after
         Response balanceOverallAfter = portfolioService.getBalance(token, cookie);
         Response balanceByMarketAfter = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(balanceOverallAfter.getStatusCode()).isEqualTo(200);
         assertThat(balanceByMarketAfter.getStatusCode()).isEqualTo(200);
+        balanceOverallAfter.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        balanceByMarketAfter.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+
+        long balanceBefore = Long.parseLong(balanceByMarketBefore.path("usdc_balance").toString());
+        long balanceAfter = Long.parseLong(balanceByMarketAfter.path("usdc_balance").toString());
+        assertThat(balanceAfter).isLessThan(balanceBefore);
+        assertThat(balanceBefore - balanceAfter).isGreaterThan(0);
 
         BalanceResponse afterOverall = balanceOverallAfter.as(BalanceResponse.class);
         BalanceResponse afterByMarket = balanceByMarketAfter.as(BalanceResponse.class);
@@ -360,7 +417,7 @@ public class OrderTest extends BaseApiTest {
         assertBalanceReflectsOrder(beforeByMarket, afterByMarket, ORDER_AMOUNT);
     }
 
-    @Test(description = "Balance (overall or by market) when total/available/reserved present: available = total - reserved")
+    @Test(description = "Balance: overall usdc_balance >= by-market usdc_balance (market-level accounts for reserved); when total/available/reserved present, available = total - reserved")
     public void balance_availableEqualsTotalMinusReserved_whenFieldsPresent() {
         String marketId = Config.getMarketId();
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
@@ -369,6 +426,12 @@ public class OrderTest extends BaseApiTest {
         Response byMarketRes = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(overallRes.getStatusCode()).isEqualTo(200);
         assertThat(byMarketRes.getStatusCode()).isEqualTo(200);
+        overallRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        byMarketRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+
+        long overall = Long.parseLong(overallRes.path("usdc_balance").toString());
+        long byMarket = Long.parseLong(byMarketRes.path("usdc_balance").toString());
+        assertThat(overall).isGreaterThanOrEqualTo(byMarket);
 
         assertAvailableEqualsTotalMinusReserved(overallRes.as(BalanceResponse.class));
         assertAvailableEqualsTotalMinusReserved(byMarketRes.as(BalanceResponse.class));
