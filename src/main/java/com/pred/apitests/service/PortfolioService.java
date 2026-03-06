@@ -14,6 +14,8 @@ public class PortfolioService extends BaseService {
     private static final String POSITIONS_PATH = "/api/v1/portfolio/positions";
     private static final String BALANCE_PATH = "/api/v1/portfolio/balance";
     private static final String BALANCE_BY_MARKET_PATH = "/api/v1/portfolio/balance?parent_market_id=%s&market_id=%s";
+    private static final String PNL_PATH = "/api/v1/portfolio/pnl";
+    private static final String EARNINGS_PATH = "/api/v1/portfolio/earnings";
     private static final String INTERNAL_BALANCE_PATH = "/api/v1/balance/info";
 
     /**
@@ -39,6 +41,24 @@ public class PortfolioService extends BaseService {
         String path = String.format(BALANCE_BY_MARKET_PATH, marketId, marketId);
         RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
         return spec.when().get(path);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/pnl
+     * (Backend may expect GET; POST returned 404 on UAT.)
+     */
+    public Response getPnl(String accessToken, String refreshCookie) {
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(PNL_PATH);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/earnings
+     * Response: user_id, realized_pnl (PnL when position closed), unrealized_pnl (open position PnL from mark price), total_pnl.
+     */
+    public Response getEarnings(String accessToken, String refreshCookie) {
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(EARNINGS_PATH);
     }
 
     /**

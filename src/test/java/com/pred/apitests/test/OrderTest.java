@@ -125,6 +125,132 @@ public class OrderTest extends BaseApiTest {
         assertThat(status).isEqualTo(202);
     }
 
+    @Test(description = "Cancel order with valid order_id and market_id returns 2xx")
+    public void cancelOrder_withValidOrderId_returns2xx() {
+        String marketId = Config.getMarketId();
+        String tokenId = Config.getTokenId();
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+        if (tokenId == null || tokenId.isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank()) throw new SkipException("EOA not in TokenManager");
+        if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
+
+        String orderId = placeOrderAndReturnOrderId(marketId, tokenId);
+        assertThat(orderId).as("place order should return order_id").isNotBlank();
+
+        Response response = orderService.cancelOrder(token, cookie, marketId, orderId);
+        assertThat(response.getStatusCode()).as("cancel order response").isBetween(200, 299);
+        String body = response.getBody().asString();
+        assertThat(body).as("cancel response body").contains("user_cancelled").contains("order_id");
+    }
+
+    /**
+     * Full flow: place order 1 -> check balance/earnings/positions -> place order 2 (different signature) ->
+     * check balance/earnings/positions -> cancel order 2 -> check balance/earnings/positions.
+     * PnL data comes from earnings API (/api/v1/portfolio/earnings). Position may appear when another user matches order 1.
+     */
+    @Test(description = "Flow: place 2 orders (2nd with different signature), cancel 2nd; check balance, earnings, positions in between")
+    public void flow_placeTwoOrders_cancelSecond_withBalancePnlPositionsChecks() {
+        String marketId = Config.getMarketId();
+        String tokenId = Config.getTokenId();
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+        if (tokenId == null || tokenId.isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank()) throw new SkipException("EOA not in TokenManager");
+        if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
+
+        // 1) Baseline: balance, earnings (PnL), positions
+        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+
+        // 2) Place order 1 (first signature)
+        String orderId1 = placeOrderAndReturnOrderId(marketId, tokenId);
+        assertThat(orderId1).as("place order 1 should return order_id in response").isNotBlank();
+
+        // 3) After order 1: balance, earnings, positions
+        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+
+        // 4) Place order 2 (different salt/timestamp -> different signature)
+        String orderId2 = placeOrderAndReturnOrderId(marketId, tokenId);
+        assertThat(orderId2).as("place order 2 should return order_id in response").isNotBlank();
+        assertThat(orderId2).as("order 2 id should differ from order 1").isNotEqualTo(orderId1);
+
+        // 5) After order 2: balance, earnings, positions
+        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+
+        // 6) Cancel order 2
+        Response cancelResponse = orderService.cancelOrder(token, cookie, marketId, orderId2);
+        assertThat(cancelResponse.getStatusCode()).as("cancel order 2").isBetween(200, 299);
+
+        // 7) After cancel: balance, earnings, positions (order 1 still open; position may appear if order 1 is matched later)
+        assertThat(portfolioService.getBalance(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getEarnings(token, cookie).getStatusCode()).isEqualTo(200);
+        assertThat(portfolioService.getPositions(token, cookie).getStatusCode()).isEqualTo(200);
+    }
+
+    /**
+     * Place one order with a unique salt/timestamp (so signature is unique). Returns order_id from response.
+     * Expected place-order response shape: { "status": "open_order", "order_id": "<uuid>", "message": "...", "filled_quantity": "0" }
+     */
+    private String placeOrderAndReturnOrderId(String marketId, String tokenId) {
+        String salt = String.valueOf(System.currentTimeMillis());
+        long timestampSec = System.currentTimeMillis() / 1000;
+
+        SignOrderRequest signRequest = SignOrderRequest.builder()
+                .salt(salt)
+                .price(ORDER_PRICE)
+                .quantity(ORDER_QUANTITY)
+                .questionId(marketId)
+                .timestamp(timestampSec)
+                .feeRateBps(0)
+                .intent(0)
+                .signatureType(2)
+                .taker("0x0000000000000000000000000000000000000000")
+                .expiration("0")
+                .nonce("0")
+                .maker(proxyWallet)
+                .signer(eoa)
+                .priceInCents(false)
+                .build();
+        String keyForSign = TokenManager.getInstance().getPrivateKey();
+        if (keyForSign == null || keyForSign.isBlank()) keyForSign = System.getenv("PRIVATE_KEY");
+        if (keyForSign != null && !keyForSign.isBlank()) signRequest.setPrivateKey(keyForSign);
+
+        SignOrderResponse sigResponse = signatureService.signOrder(Config.getSigServerUrl(), signRequest);
+        assertThat(sigResponse).isNotNull();
+        assertThat(sigResponse.isOk()).isTrue();
+
+        PlaceOrderRequest orderBody = PlaceOrderRequest.builder()
+                .salt(salt)
+                .userId(userId)
+                .marketId(marketId)
+                .side("long")
+                .tokenId(tokenId)
+                .price(ORDER_PRICE)
+                .quantity(ORDER_QUANTITY)
+                .amount(ORDER_AMOUNT)
+                .isLowPriority(false)
+                .signature(sigResponse.getSignature())
+                .type("limit")
+                .timestamp(timestampSec)
+                .reduceOnly(false)
+                .feeRateBps(0)
+                .build();
+
+        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        assertThat(response.getStatusCode()).as("place order").isEqualTo(202);
+
+        // Response: { "status": "open_order", "order_id": "<uuid>", "message": "...", "filled_quantity": "0" }
+        String orderId = response.jsonPath().getString("order_id");
+        if (orderId == null || orderId.isBlank()) {
+            orderId = response.jsonPath().getString("data.order_id");
+        }
+        return orderId != null ? orderId.trim() : "";
+    }
+
     @Test(description = "Place order with invalid signature returns 4xx")
     public void placeOrder_withInvalidSignature_returns4xx() {
         String marketId = Config.getMarketId();

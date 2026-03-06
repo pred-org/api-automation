@@ -48,4 +48,12 @@ public class PortfolioTest extends BaseApiTest {
         Response response = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
     }
+
+    @Test(description = "GET portfolio earnings returns 200; use earnings for PnL data (user_id, realized_pnl, unrealized_pnl, total_pnl)")
+    public void getEarnings_returns200() {
+        Response response = portfolioService.getEarnings(token, cookie);
+        assertThat(response.getStatusCode()).isEqualTo(200);
+        String body = response.getBody().asString();
+        assertThat(body).contains("user_id").contains("realized_pnl").contains("unrealized_pnl").contains("total_pnl");
+    }
 }

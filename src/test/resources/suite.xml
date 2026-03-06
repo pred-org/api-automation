@@ -3,7 +3,8 @@
 <suite name="API Automation Suite" verbose="1">
     <listeners>
         <listener class-name="com.pred.apitests.listeners.TestListener"/>
-        <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/>
+        <!-- SlackNotificationListener disabled for now; re-add when you want suite summary in Slack -->
+        <!-- <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/> -->
     </listeners>
     <test name="API tests">
         <classes>

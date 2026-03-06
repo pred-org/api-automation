@@ -88,4 +88,9 @@ public abstract class BaseService {
     protected Response delete(String baseUri, String path) {
         return given(baseUri).when().delete(path);
     }
+
+    /** DELETE with JSON body (e.g. cancel order). */
+    protected Response delete(String baseUri, String path, Object body) {
+        return given(baseUri).body(body).when().delete(path);
+    }
 }
