@@ -135,4 +135,22 @@ public final class Config {
                 PROPS.getProperty("slack.webhook.url")
         );
     }
+
+    /** Slack Bot Token (xoxb-...) for Web API (thread replies). If set with SLACK_CHANNEL, used instead of webhook. */
+    public static String getSlackBotToken() {
+        return firstNonBlank(
+                System.getProperty("slack.bot.token"),
+                System.getenv("SLACK_BOT_TOKEN"),
+                PROPS.getProperty("slack.bot.token")
+        );
+    }
+
+    /** Slack channel ID (e.g. C01234...) for chat.postMessage. Required when using SLACK_BOT_TOKEN. */
+    public static String getSlackChannel() {
+        return firstNonBlank(
+                System.getProperty("slack.channel"),
+                System.getenv("SLACK_CHANNEL"),
+                PROPS.getProperty("slack.channel")
+        );
+    }
 }
