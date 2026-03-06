@@ -126,4 +126,13 @@ public final class Config {
             return 1_000_000_000L;
         }
     }
+
+    /** Slack Incoming Webhook URL. If blank, Slack notification is skipped. */
+    public static String getSlackWebhookUrl() {
+        return firstNonBlank(
+                System.getProperty("slack.webhook.url"),
+                System.getenv("SLACK_WEBHOOK_URL"),
+                PROPS.getProperty("slack.webhook.url")
+        );
+    }
 }

@@ -33,6 +33,7 @@ Config is read by `Config.java` with this **priority** (first non-blank wins):
 | `market.id` / `MARKET_ID` | Market ID for order/portfolio | testdata.properties or env |
 | `token.id` / `TOKEN_ID` | Outcome token for place-order | testdata.properties or env |
 | `deposit.amount` / `DEPOSIT_AMOUNT` | Deposit amount (long) | testdata.properties or env |
+| `slack.webhook.url` / `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL; post suite summary (total/passed/failed/skipped). Blank = no notification | env or testdata.properties |
 
 **Order test data in testdata.properties** (`order.side`, `order.price`, `order.quantity`, `order.type`): currently **not** read by `Config.java`; `OrderTest` uses hardcoded values (e.g. price "30", quantity "100"). To make them configurable, add `Config.getOrderPrice()`, etc., and wire from testdata.
 
@@ -49,6 +50,16 @@ Config is read by `Config.java` with this **priority** (first non-blank wins):
 | File | Purpose |
 |------|--------|
 | `src/test/resources/suite.xml` | TestNG suite: which test classes run and in what order. Edit to include/exclude tests. |
+
+### 1.5 Slack notification
+
+After the suite finishes, a one-line summary is sent to Slack: **total | passed | failed | skipped**. To enable:
+
+1. In Slack: create an **Incoming Webhook** (Settings / Integrations / Incoming Webhooks / Add to Slack; choose the channel).
+2. Set the webhook URL: `export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` before `mvn test`, or add `slack.webhook.url=...` to `testdata.properties` (do not commit real URLs if the repo is shared).
+3. If `SLACK_WEBHOOK_URL` / `slack.webhook.url` is blank, no request is sent.
+
+Listener: `SlackNotificationListener` (registered in `suite.xml`).
 
 ---
 
@@ -115,3 +126,4 @@ These use `config.js` and can override via env:
 | …change order price/quantity in Java OrderTest | Edit hardcoded values in OrderTest.java (or add Config getters and testdata keys) |
 | …run a subset of tests | Edit `src/test/resources/suite.xml` |
 | …switch EIP-712 domain (e.g. prod) | Edit `sig-server/config.js`: `CHAIN_ID`, `VERIFYING_CONTRACT`, `DOMAIN_NAME`, `DOMAIN_VERSION` |
+| …post test summary to Slack | Set `SLACK_WEBHOOK_URL` (env) or `slack.webhook.url` (testdata.properties). Create webhook in Slack first. |

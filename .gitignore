@@ -31,6 +31,9 @@ allure-report/
 sig-server/node_modules/
 sig-server/config.js
 
+# Local backup bundles (do not commit)
+*.bundle
+
 # OS
 .DS_Store
 Thumbs.db
