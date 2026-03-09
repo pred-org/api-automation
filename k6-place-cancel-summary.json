@@ -1,0 +1,287 @@
+{
+  "root_group": {
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+        {
+          "name": "cancel-order 2xx",
+          "path": "::cancel-order 2xx",
+          "id": "823154b7784c3232ac4680ac5a3d61cc",
+          "passes": 308,
+          "fails": 40
+        }
+      ],
+    "name": ""
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 62775.717
+  },
+  "metrics": {
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 176.636,
+        "p(90)": 0,
+        "p(95)": 159.39309999999998,
+        "avg": 11.847100574712645,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "fails": 40,
+        "rate": 0.8850574712643678,
+        "passes": 308
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 1002.6253499000001,
+        "p(95)": 1008.3709392,
+        "avg": 843.7193549031897,
+        "min": 800.036875,
+        "med": 801.1546665000001,
+        "max": 1407.955666
+      }
+    },
+    "cancel_order_failed": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 40,
+        "rate": 0.6371890583105566
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "min": 12,
+        "max": 25,
+        "value": 25
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 213653,
+        "rate": 3403.4338468806336
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 204.27676948051948,
+        "min": 185.805,
+        "med": 202.813,
+        "max": 450.403,
+        "p(90)": 216.3459,
+        "p(95)": 223.2318
+      }
+    },
+    "cancel_failure_by_status": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.6371890583105566,
+        "count": 40
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 1818,
+        "rate": 28.9602427002148
+      }
+    },
+    "cancel_fail_429": {
+      "values": {
+        "count": 40,
+        "rate": 0.6371890583105566
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "rate": 2460.1869541370593,
+        "count": 154440
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.22341954022988494,
+        "min": 0.047,
+        "med": 0.176,
+        "max": 2.14,
+        "p(90)": 0.35470000000000007,
+        "p(95)": 0.44209999999999977
+      }
+    },
+    "cancel_order_attempts": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 5.543544807301842,
+        "count": 348
+      }
+    },
+    "cancel_order_hits": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 308,
+        "rate": 4.9063557489912855
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 0.11760000000000002,
+        "p(95)": 0.163,
+        "avg": 0.07301149425287351,
+        "min": 0.016,
+        "med": 0.053,
+        "max": 1.082
+      }
+    },
+    "cancel_order_latency_ms": {
+      "contains": "default",
+      "values": {
+        "avg": 199.7668275862069,
+        "min": 155.744,
+        "med": 201.399,
+        "max": 450.403,
+        "p(90)": 214.7776,
+        "p(95)": 222.172
+      },
+      "type": "trend"
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 25,
+        "min": 25,
+        "max": 25
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0.001,
+        "max": 379.515,
+        "p(90)": 0.001,
+        "p(95)": 314.42045,
+        "avg": 23.41178448275874,
+        "min": 0
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 153.84735,
+        "avg": 11.446511494252874,
+        "min": 0,
+        "med": 0,
+        "max": 171.953,
+        "p(90)": 0
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 221.8665,
+        "avg": 199.47039655172424,
+        "min": 155.581,
+        "med": 201.03,
+        "max": 450.144,
+        "p(90)": 214.4511
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 348,
+        "rate": 5.543544807301842
+      }
+    },
+    "http_req_duration": {
+      "values": {
+        "avg": 199.7668275862069,
+        "min": 155.744,
+        "med": 201.399,
+        "max": 450.403,
+        "p(90)": 214.7776,
+        "p(95)": 222.172
+      },
+      "thresholds": {
+        "p(95)<15000": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_failed": {
+      "thresholds": {
+        "rate<0.5": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.11494252873563218,
+        "passes": 40,
+        "fails": 308
+      }
+    }
+  },
+  "setup_data": {
+    "totalOrderIds": 348,
+    "useFileOrderIds": true,
+    "BASE_URL": "https://uat-frankfurt.pred.app",
+    "MARKET_ID": "0xf83d64fbb43a9b199109a96fee6291fc66b9fe0a5cd38b0bd2901fd10d7f1900",
+    "placeHeaders": {
+      "Cookie": "refresh_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZTg1Mzc5YmQtMmQxNy00MTQwLTlmNWQtNGFiNjhlYjg0N2RkIiwidG9rZW5fdHlwZSI6InJlZnJlc2giLCJvcmlnaW5hbF9jcmVhdGVkX2F0IjoxNzczMDkyMzcyODY0LCJsYXRlc3RfYWN0aXZpdHlfYXQiOjE3NzMwOTIzNzI4NjQsInNlc3Npb25faWQiOiJkMmNlMjAwMi01MWM1LTRmMTctYTgwMC02OWU0NGU1MWMwODgiLCJyb2xlIjoiTUFSS0VUX01BS0VSIiwiaXNzIjoiaHR0cHM6Ly91YXQtZnJhbmtmdXJ0LnByZWQuYXBwL2F1dGgiLCJzdWIiOiJlODUzNzliZC0yZDE3LTQxNDAtOWY1ZC00YWI2OGViODQ3ZGQiLCJhdWQiOlsiYXV0aCJdLCJleHAiOjE4MDQ2MjgzNzIsIm5iZiI6MTc3MzA5MjM3MiwiaWF0IjoxNzczMDkyMzcyfQ.pwBAYDMFmlPCOQyfBgSGdjkRXfGcG3ZmHNyh_SwlwQPew8z_cCqxU30YNs6QU-zdTgbmuQ0Nhv8-COFCGwrG6IaTJfyRQ05XDNc2jzNwfvfO62p4W7hi0tVW8GP1yh7yosSQMjWzdLAikbITHImNg_55EtYbSnKjWx8gGCW2TzoWb1CpldyBwlLQ1QI0aF-BxV28HHgp2Z8tT6-HYvQv9Sxjm1VlXrZslyxW9KH9C0-gPf3vCDk6ii_P_2U5_tT97ImbSoZl2job7FgZfHY9Ul91rHw-goAzNhIh1Z9q1sPfFKyeaWR5jpxrCvlU8E2q4pKXrB_6mV73CnRFDY5GFg",
+      "X-Proxy-Address": "0x54c7d8B0808357486Ef6bddE7475e06146B3fa90",
+      "X-Wallet-Address": "0x0d248E2d6cD3E815d64274d5B3F37771588285B6",
+      "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6InVhdC1rZXktMiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZTg1Mzc5YmQtMmQxNy00MTQwLTlmNWQtNGFiNjhlYjg0N2RkIiwidG9rZW5fdHlwZSI6ImFjY2VzcyIsInNlc3Npb25faWQiOiJkMmNlMjAwMi01MWM1LTRmMTctYTgwMC02OWU0NGU1MWMwODgiLCJyb2xlIjoiTUFSS0VUX01BS0VSIiwiaXNfZW5hYmxlZF90cmFkaW5nIjp0cnVlLCJpc3MiOiJodHRwczovL3VhdC1mcmFua2Z1cnQucHJlZC5hcHAvYXV0aCIsInN1YiI6ImU4NTM3OWJkLTJkMTctNDE0MC05ZjVkLTRhYjY4ZWI4NDdkZCIsImF1ZCI6WyJhdXRoIl0sImV4cCI6MTc3MzA5NTk3MiwibmJmIjoxNzczMDkyMzcyLCJpYXQiOjE3NzMwOTIzNzJ9.tFfFe9JxuPZTkidgv3x0mW8SAtSJv8Z-n-iplydFEet8UzSSa19LIWZPpo0afk9-YbxW_bc9QHOTNxdggo_u1iflJRwAHN15ID9zjdHN8tvCMq2DbkWtLR1EFQ5BGckEVOHeSykfbVFzn-1tJwVjn0Z92Pox2_e568Nr0bB5Q5zWQBS_7jMBwyJRt4AN09ICkLRb8ryWUNK916yFATlpNRmUGr8NpvdGDGB-818OSsek3_vmDltYgaH_nnPVSacogU9bkpp25eDtsNJokeVzEl3iITcKXqaL6_MBKSOX8WO92MM9EdDqBOZ0IN8bMOONgiih5O0S_hVS75GsncEZEQ",
+      "Content-Type": "application/json"
+    }
+  }
+}

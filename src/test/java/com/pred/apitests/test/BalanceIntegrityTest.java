@@ -193,8 +193,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
         System.out.println("[EXACT DELTA] " + delta);
         assertThat(delta).isGreaterThan(0L);
         if (EXPECTED_DELTA_PRICE30_QTY100 > 0L) {
-            assertThat(delta).isEqualTo(EXPECTED_DELTA_PRICE30_QTY100);
-        }
+            assertThat(delta).isEqualTo(EXPECTED_DELTA_PRICE30_QTY100); }
         cancelOrder(orderId);
     }
 

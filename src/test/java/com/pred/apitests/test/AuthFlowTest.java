@@ -6,6 +6,7 @@ import com.pred.apitests.model.request.LoginRequest;
 import com.pred.apitests.model.response.SignCreateProxyResponse;
 import com.pred.apitests.service.AuthService;
 import com.pred.apitests.service.SignatureService;
+import com.pred.apitests.util.SessionFileWriter;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.slf4j.Logger;
@@ -85,6 +86,10 @@ public class AuthFlowTest extends BaseApiTest {
         LOG.info("Login success. userId={} proxy={}",
             loginResponse.getUserId(),
             loginResponse.getProxyWalletAddress());
+
+        if (SessionFileWriter.writeFromTokenManager()) {
+            LOG.info("Session written to .env.session (source it for k6)");
+        }
     }
 
     @Test(description = "Print access token for Postman (copy from output)")

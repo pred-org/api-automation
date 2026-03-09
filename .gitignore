@@ -20,6 +20,7 @@ logs/
 # Environment and secrets (never commit)
 .env
 .env.local
+.env.session
 .env.*.local
 scripts/set_env.sh
 
