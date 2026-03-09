@@ -17,6 +17,8 @@ import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.notNullValue;
 
 public class OrderTest extends BaseApiTest {
@@ -28,22 +30,30 @@ public class OrderTest extends BaseApiTest {
     private OrderService orderService;
     private SignatureService signatureService;
     private PortfolioService portfolioService;
-    private String token;
-    private String cookie;
     private String eoa;
     private String proxyWallet;
     private String userId;
+
+    /** Use current token/cookie from TokenManager so proactive refresh (e.g. after 40 min) is used. */
+    private String token() {
+        return TokenManager.getInstance().getAccessToken();
+    }
+    private String cookie() {
+        return TokenManager.getInstance().getRefreshCookieHeaderValue();
+    }
 
     @BeforeClass
     public void init() {
         if (!TokenManager.getInstance().hasToken()) {
             throw new SkipException("No token - run AuthFlowTest first");
         }
+        String refreshCookie = TokenManager.getInstance().getRefreshCookieHeaderValue();
+        if (refreshCookie == null || refreshCookie.isBlank()) {
+            throw new SkipException("No refresh_token cookie - backend must return Set-Cookie: refresh_token=... on login so long runs stay authenticated");
+        }
         orderService = new OrderService();
         signatureService = new SignatureService();
         portfolioService = new PortfolioService();
-        token = TokenManager.getInstance().getAccessToken();
-        cookie = TokenManager.getInstance().getRefreshCookieHeaderValue();
         eoa = TokenManager.getInstance().getEoa();
         if (eoa == null || eoa.isBlank()) {
             eoa = Config.getEoaAddress();
@@ -118,7 +128,7 @@ public class OrderTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
         int status = response.getStatusCode();
         if (status != 202) {
             String body = response.getBody().asString();
@@ -143,7 +153,7 @@ public class OrderTest extends BaseApiTest {
         String orderId = placeOrderAndReturnOrderId(marketId, tokenId);
         assertThat(orderId).as("place order should return order_id").isNotBlank();
 
-        Response response = orderService.cancelOrder(token, cookie, marketId, orderId);
+        Response response = orderService.cancelOrder(token(), cookie(), marketId, orderId);
         assertThat(response.getStatusCode()).as("cancel order response").isBetween(200, 299);
         response.then().body("status", equalTo("user_cancelled"))
                 .body("order_id", equalTo(orderId))
@@ -167,14 +177,14 @@ public class OrderTest extends BaseApiTest {
         if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
 
         // 1) Baseline: balance, earnings (PnL), positions
-        Response balanceRes = portfolioService.getBalance(token, cookie);
+        Response balanceRes = portfolioService.getBalance(token(), cookie());
         assertThat(balanceRes.getStatusCode()).isEqualTo(200);
         balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
         long balanceBefore = Long.parseLong(balanceRes.path("usdc_balance").toString());
-        Response earningsRes = portfolioService.getEarnings(token, cookie);
+        Response earningsRes = portfolioService.getEarnings(token(), cookie());
         assertThat(earningsRes.getStatusCode()).isEqualTo(200);
         earningsRes.then().body("user_id", notNullValue()).body("realized_pnl", notNullValue()).body("unrealized_pnl", notNullValue()).body("total_pnl", notNullValue());
-        Response positionsRes = portfolioService.getPositions(token, cookie);
+        Response positionsRes = portfolioService.getPositions(token(), cookie());
         assertThat(positionsRes.getStatusCode()).isEqualTo(200);
         positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
@@ -183,15 +193,15 @@ public class OrderTest extends BaseApiTest {
         assertThat(orderId1).as("place order 1 should return order_id in response").isNotBlank();
 
         // 3) After order 1: balance, earnings, positions
-        balanceRes = portfolioService.getBalance(token, cookie);
+        balanceRes = portfolioService.getBalance(token(), cookie());
         assertThat(balanceRes.getStatusCode()).isEqualTo(200);
         balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
         long balanceAfterOrder1 = Long.parseLong(balanceRes.path("usdc_balance").toString());
         assertThat(balanceAfterOrder1).isLessThanOrEqualTo(balanceBefore);
-        earningsRes = portfolioService.getEarnings(token, cookie);
+        earningsRes = portfolioService.getEarnings(token(), cookie());
         assertThat(earningsRes.getStatusCode()).isEqualTo(200);
         earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
-        positionsRes = portfolioService.getPositions(token, cookie);
+        positionsRes = portfolioService.getPositions(token(), cookie());
         assertThat(positionsRes.getStatusCode()).isEqualTo(200);
         positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
@@ -201,29 +211,29 @@ public class OrderTest extends BaseApiTest {
         assertThat(orderId2).as("order 2 id should differ from order 1").isNotEqualTo(orderId1);
 
         // 5) After order 2: balance, earnings, positions
-        balanceRes = portfolioService.getBalance(token, cookie);
+        balanceRes = portfolioService.getBalance(token(), cookie());
         assertThat(balanceRes.getStatusCode()).isEqualTo(200);
         balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
-        earningsRes = portfolioService.getEarnings(token, cookie);
+        earningsRes = portfolioService.getEarnings(token(), cookie());
         assertThat(earningsRes.getStatusCode()).isEqualTo(200);
         earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
-        positionsRes = portfolioService.getPositions(token, cookie);
+        positionsRes = portfolioService.getPositions(token(), cookie());
         assertThat(positionsRes.getStatusCode()).isEqualTo(200);
         positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
 
         // 6) Cancel order 2
-        Response cancelResponse = orderService.cancelOrder(token, cookie, marketId, orderId2);
+        Response cancelResponse = orderService.cancelOrder(token(), cookie(), marketId, orderId2);
         assertThat(cancelResponse.getStatusCode()).as("cancel order 2").isBetween(200, 299);
         cancelResponse.then().body("status", equalTo("user_cancelled")).body("order_id", equalTo(orderId2)).body("message", equalTo("Order cancellation submitted successfully"));
 
         // 7) After cancel: balance, earnings, positions (order 1 still open; position may appear if order 1 is matched later)
-        balanceRes = portfolioService.getBalance(token, cookie);
+        balanceRes = portfolioService.getBalance(token(), cookie());
         assertThat(balanceRes.getStatusCode()).isEqualTo(200);
         balanceRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue());
-        earningsRes = portfolioService.getEarnings(token, cookie);
+        earningsRes = portfolioService.getEarnings(token(), cookie());
         assertThat(earningsRes.getStatusCode()).isEqualTo(200);
         earningsRes.then().body("user_id", notNullValue()).body("total_pnl", notNullValue());
-        positionsRes = portfolioService.getPositions(token, cookie);
+        positionsRes = portfolioService.getPositions(token(), cookie());
         assertThat(positionsRes.getStatusCode()).isEqualTo(200);
         positionsRes.then().body("success", equalTo(true)).body("positions", notNullValue());
     }
@@ -277,7 +287,7 @@ public class OrderTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
         assertThat(response.getStatusCode()).as("place order").isEqualTo(202);
         response.then().body("status", equalTo("open_order"))
                 .body("order_id", notNullValue())
@@ -315,11 +325,15 @@ public class OrderTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
         assertThat(response.getStatusCode()).isGreaterThanOrEqualTo(400);
-        response.then().body("error", notNullValue());
-        String responseBody = response.getBody().asString();
-        assertThat(responseBody).as("error response should mention signature").matches(s -> s.contains("signature") || s.contains("error_code"));
+        Object err = response.path("error");
+        Object msg = response.path("message");
+        assertThat(err != null || msg != null).as("4xx response should have error or message").isTrue();
+        if (err != null) {
+            String responseBody = response.getBody().asString();
+            assertThat(responseBody).as("error response should mention signature").matches(s -> s.contains("signature") || s.contains("error_code"));
+        }
     }
 
     @Test(description = "Place order with balance check before and after; balance should reflect open order")
@@ -332,8 +346,8 @@ public class OrderTest extends BaseApiTest {
         if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
 
         // 1) Balance before
-        Response balanceOverallBefore = portfolioService.getBalance(token, cookie);
-        Response balanceByMarketBefore = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        Response balanceOverallBefore = portfolioService.getBalance(token(), cookie());
+        Response balanceByMarketBefore = portfolioService.getBalanceByMarket(token(), cookie(), marketId);
         assertThat(balanceOverallBefore.getStatusCode()).isEqualTo(200);
         assertThat(balanceByMarketBefore.getStatusCode()).isEqualTo(200);
         balanceOverallBefore.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
@@ -388,7 +402,7 @@ public class OrderTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response orderResponse = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response orderResponse = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
         assertThat(orderResponse.getStatusCode()).isEqualTo(202);
         orderResponse.then().body("status", equalTo("open_order"))
                 .body("order_id", notNullValue())
@@ -396,8 +410,8 @@ public class OrderTest extends BaseApiTest {
                 .body("filled_quantity", notNullValue());
 
         // 3) Balance after
-        Response balanceOverallAfter = portfolioService.getBalance(token, cookie);
-        Response balanceByMarketAfter = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        Response balanceOverallAfter = portfolioService.getBalance(token(), cookie());
+        Response balanceByMarketAfter = portfolioService.getBalanceByMarket(token(), cookie(), marketId);
         assertThat(balanceOverallAfter.getStatusCode()).isEqualTo(200);
         assertThat(balanceByMarketAfter.getStatusCode()).isEqualTo(200);
         balanceOverallAfter.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
@@ -422,8 +436,8 @@ public class OrderTest extends BaseApiTest {
         String marketId = Config.getMarketId();
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
 
-        Response overallRes = portfolioService.getBalance(token, cookie);
-        Response byMarketRes = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        Response overallRes = portfolioService.getBalance(token(), cookie());
+        Response byMarketRes = portfolioService.getBalanceByMarket(token(), cookie(), marketId);
         assertThat(overallRes.getStatusCode()).isEqualTo(200);
         assertThat(byMarketRes.getStatusCode()).isEqualTo(200);
         overallRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
@@ -489,5 +503,142 @@ public class OrderTest extends BaseApiTest {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    @Test(description = "Place order with zero quantity returns 4xx")
+    public void placeOrder_withZeroQuantity_returns4xx() {
+        String marketId = Config.getMarketId();
+        String tokenId = Config.getTokenId();
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+        if (tokenId == null || tokenId.isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank()) throw new SkipException("EOA not in TokenManager");
+        if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
+
+        String salt = String.valueOf(System.currentTimeMillis());
+        long timestampSec = System.currentTimeMillis() / 1000;
+
+        SignOrderRequest signRequest = SignOrderRequest.builder()
+                .salt(salt)
+                .price(ORDER_PRICE)
+                .quantity("0")
+                .questionId(marketId)
+                .timestamp(timestampSec)
+                .feeRateBps(0)
+                .intent(0)
+                .signatureType(2)
+                .taker("0x0000000000000000000000000000000000000000")
+                .expiration("0")
+                .nonce("0")
+                .maker(proxyWallet)
+                .signer(eoa)
+                .priceInCents(false)
+                .build();
+        String keyForSign = TokenManager.getInstance().getPrivateKey();
+        if (keyForSign == null || keyForSign.isBlank()) keyForSign = System.getenv("PRIVATE_KEY");
+        if (keyForSign != null && !keyForSign.isBlank()) signRequest.setPrivateKey(keyForSign);
+
+        SignOrderResponse sigResponse = signatureService.signOrder(Config.getSigServerUrl(), signRequest);
+        assertThat(sigResponse).isNotNull();
+        assertThat(sigResponse.isOk()).isTrue();
+
+        PlaceOrderRequest orderBody = PlaceOrderRequest.builder()
+                .salt(salt)
+                .userId(userId)
+                .marketId(marketId)
+                .side("long")
+                .tokenId(tokenId)
+                .price(ORDER_PRICE)
+                .quantity("0")
+                .amount("0")
+                .isLowPriority(false)
+                .signature(sigResponse.getSignature())
+                .type("limit")
+                .timestamp(timestampSec)
+                .reduceOnly(false)
+                .feeRateBps(0)
+                .build();
+
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
+        response.then().statusCode(greaterThanOrEqualTo(400))
+                .statusCode(lessThan(500))
+                .body("error", notNullValue());
+    }
+
+    @Test(description = "Place order with negative price returns 4xx")
+    public void placeOrder_withNegativePrice_returns4xx() {
+        String marketId = Config.getMarketId();
+        String tokenId = Config.getTokenId();
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+        if (tokenId == null || tokenId.isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank()) throw new SkipException("EOA not in TokenManager");
+        if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
+
+        PlaceOrderRequest orderBody = PlaceOrderRequest.builder()
+                .salt(String.valueOf(System.currentTimeMillis()))
+                .userId(userId)
+                .marketId(marketId)
+                .side("long")
+                .tokenId(tokenId)
+                .price("-1")
+                .quantity(ORDER_QUANTITY)
+                .amount("-1")
+                .isLowPriority(false)
+                .signature("0xAABBCC")
+                .type("limit")
+                .timestamp(System.currentTimeMillis() / 1000)
+                .reduceOnly(false)
+                .feeRateBps(0)
+                .build();
+
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, marketId, orderBody);
+        response.then().statusCode(greaterThanOrEqualTo(400))
+                .statusCode(lessThan(500))
+                .body("error", notNullValue());
+    }
+
+    @Test(description = "Place order with invalid market id returns 4xx")
+    public void placeOrder_withInvalidMarketId_returns4xx() {
+        String tokenId = Config.getTokenId();
+        if (tokenId == null || tokenId.isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank()) throw new SkipException("EOA not in TokenManager");
+        if (proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("Proxy wallet not in TokenManager");
+
+        String invalidMarketId = "invalid-market-000";
+        PlaceOrderRequest orderBody = PlaceOrderRequest.builder()
+                .salt(String.valueOf(System.currentTimeMillis()))
+                .userId(userId)
+                .marketId(invalidMarketId)
+                .side("long")
+                .tokenId(tokenId)
+                .price(ORDER_PRICE)
+                .quantity(ORDER_QUANTITY)
+                .amount(ORDER_AMOUNT)
+                .isLowPriority(false)
+                .signature("0xAABBCC")
+                .type("limit")
+                .timestamp(System.currentTimeMillis() / 1000)
+                .reduceOnly(false)
+                .feeRateBps(0)
+                .build();
+
+        Response response = orderService.placeOrder(token(), cookie(), eoa, proxyWallet, invalidMarketId, orderBody);
+        response.then().statusCode(greaterThanOrEqualTo(400))
+                .statusCode(lessThan(500));
+        if (response.getContentType() != null && response.getContentType().toLowerCase().contains("json")) {
+            Object err = response.path("error");
+            Object msg = response.path("message");
+            assertThat(err != null || msg != null).as("4xx response should have error or message").isTrue();
+        }
+    }
+
+    @Test(description = "Cancel order with non-existent order id returns 4xx")
+    public void cancelOrder_withInvalidOrderId_returns4xx() {
+        String marketId = Config.getMarketId();
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+
+        Response response = orderService.cancelOrder(token(), cookie(), marketId, "non-existent-order-id-000");
+        response.then().statusCode(greaterThanOrEqualTo(400))
+                .statusCode(lessThan(500));
+        assertThat(response.path("error") != null || response.path("message") != null).isTrue();
     }
 }

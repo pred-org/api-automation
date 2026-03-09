@@ -1,3 +1,6 @@
+// Load project-root .env so sig-server uses same config as Java (no set_env.sh needed)
+require("dotenv").config({ path: require("path").join(__dirname, "../../.env") });
+
 const express = require("express");
 const cors = require("cors");
 const { ethers } = require("ethers");

@@ -30,6 +30,8 @@ public class SlackNotificationListener implements ISuiteListener {
     private static final Logger LOG = LoggerFactory.getLogger(SlackNotificationListener.class);
     private static final String SLACK_POST_MESSAGE = "https://slack.com/api/chat.postMessage";
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** Excluded from Slack count and thread (utility that only prints token for Postman). */
+    private static final String EXCLUDE_FROM_REPORT = "printAccessTokenForPostman";
 
     @Override
     public void onFinish(ISuite suite) {
@@ -37,18 +39,21 @@ public class SlackNotificationListener implements ISuiteListener {
         String channel = Config.getSlackChannel();
         String webhookUrl = Config.getSlackWebhookUrl();
 
-        int total = 0, passed = 0, failed = 0, skipped = 0;
         List<TestStatus> testStatuses = new ArrayList<>();
         for (var entry : suite.getResults().entrySet()) {
             ITestContext ctx = entry.getValue().getTestContext();
-            passed += ctx.getPassedTests().size();
-            failed += ctx.getFailedTests().size();
-            skipped += ctx.getSkippedTests().size();
             collectTestStatuses(ctx.getPassedTests().getAllResults(), ITestResult.SUCCESS, testStatuses);
             collectTestStatuses(ctx.getFailedTests().getAllResults(), ITestResult.FAILURE, testStatuses);
             collectTestStatuses(ctx.getSkippedTests().getAllResults(), ITestResult.SKIP, testStatuses);
+            collectTestStatuses(ctx.getFailedConfigurations().getAllResults(), ITestResult.FAILURE, testStatuses);
         }
-        total = passed + failed + skipped;
+        int passed = 0, failed = 0, skipped = 0;
+        for (TestStatus t : testStatuses) {
+            if (t.status == ITestResult.SUCCESS) passed++;
+            else if (t.status == ITestResult.FAILURE) failed++;
+            else skipped++;
+        }
+        int total = passed + failed + skipped;
 
         String summary = String.format(
                 "API Automation: %d total | %d passed | %d failed | %d skipped",
@@ -72,8 +77,32 @@ public class SlackNotificationListener implements ISuiteListener {
         if (results == null) return;
         for (ITestResult r : results) {
             String name = r.getMethod() != null ? r.getMethod().getMethodName() : "unknown";
-            out.add(new TestStatus(name, status));
+            if (EXCLUDE_FROM_REPORT.equals(name)) continue;
+            Throwable th = r.getThrowable();
+            String failReason = (status == ITestResult.FAILURE && th != null)
+                    ? toOneLiner(th)
+                    : null;
+            out.add(new TestStatus(name, status, failReason));
         }
+    }
+
+    /** First line of failure message, newlines replaced by space, max 200 chars. Uses getCause() chain if message is null. */
+    private static String toOneLiner(Throwable t) {
+        String msg = messageOrClassName(t);
+        if (msg == null || msg.isBlank()) msg = t.getClass().getSimpleName();
+        String one = msg.replace('\n', ' ').replace('\r', ' ').trim();
+        if (one.length() > 200) one = one.substring(0, 197) + "...";
+        return one;
+    }
+
+    private static String messageOrClassName(Throwable t) {
+        Throwable current = t;
+        while (current != null) {
+            String msg = current.getMessage();
+            if (msg != null && !msg.isBlank()) return msg;
+            current = current.getCause();
+        }
+        return t != null ? t.getClass().getSimpleName() : null;
     }
 
     /** Returns true if the summary was sent successfully (and optionally thread); false if Web API failed. */
@@ -113,7 +142,11 @@ public class SlackNotificationListener implements ISuiteListener {
             for (TestStatus t : testStatuses) {
                 String prefix = t.status == ITestResult.SUCCESS ? "[OK] " : (t.status == ITestResult.FAILURE ? "[FAIL] " : "[SKIP] ");
                 String label = t.status == ITestResult.SUCCESS ? "passed" : (t.status == ITestResult.FAILURE ? "failed" : "skipped");
-                threadLines.append(prefix).append(t.methodName).append(" - ").append(label).append("\n");
+                threadLines.append(prefix).append(t.methodName).append(" - ").append(label);
+                if (t.failReason != null && !t.failReason.isBlank()) {
+                    threadLines.append(": ").append(t.failReason);
+                }
+                threadLines.append("\n");
             }
             if (threadLines.length() == 0) {
                 threadLines.append("(no test results)");
@@ -193,10 +226,12 @@ public class SlackNotificationListener implements ISuiteListener {
     private static final class TestStatus {
         final String methodName;
         final int status;
+        final String failReason;
 
-        TestStatus(String methodName, int status) {
+        TestStatus(String methodName, int status, String failReason) {
             this.methodName = methodName;
             this.status = status;
+            this.failReason = failReason;
         }
     }
 }

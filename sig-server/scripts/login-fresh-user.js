@@ -25,8 +25,10 @@ const config = {
 
 async function main() {
   console.log("Generating EIP-712 CreateProxy signature and logging in...\n");
+  
   const { accessToken, userId, proxy } = await loginWithConfig(config, { silent: false });
   console.log("\n--- Login successful ---");
+  
   console.log("Access Token:", accessToken ? accessToken.slice(0, 30) + "..." : "(none)");
   if (userId) console.log("USER_ID:", userId);
   if (proxy) console.log("PROXY:", proxy);

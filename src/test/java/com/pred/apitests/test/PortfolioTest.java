@@ -76,4 +76,25 @@ public class PortfolioTest extends BaseApiTest {
         String body = response.getBody().asString();
         assertThat(body).contains("user_id").contains("realized_pnl").contains("unrealized_pnl").contains("total_pnl");
     }
+
+    @Test(description = "GET balance with invalid token returns 401")
+    public void getBalance_withInvalidToken_returns401() {
+        Response response = portfolioService.getBalance("invalid-token-abc", null);
+        response.then().statusCode(401)
+                .body("message", equalTo("Unauthorized"));
+    }
+
+    @Test(description = "GET positions with invalid token returns 401")
+    public void getPositions_withInvalidToken_returns401() {
+        Response response = portfolioService.getPositions("invalid-token-abc", null);
+        response.then().statusCode(401)
+                .body("message", equalTo("Unauthorized"));
+    }
+
+    @Test(description = "GET earnings with invalid token returns 401")
+    public void getEarnings_withInvalidToken_returns401() {
+        Response response = portfolioService.getEarnings("invalid-token-abc", null);
+        response.then().statusCode(401)
+                .body("message", equalTo("Unauthorized"));
+    }
 }

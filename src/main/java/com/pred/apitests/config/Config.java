@@ -1,19 +1,59 @@
 package com.pred.apitests.config;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 /**
  * Base configuration for main code. Reads from classpath properties, then system properties, then env.
- * Used by BaseService and services. Test run has test resources on classpath.
+ * Loads .env from project root (user.dir) if present so SLACK_* and other vars are available when running via Maven.
  */
 public final class Config {
 
     private static final String DEFAULT_PUBLIC_BASE = "https://api.example.com";
     private static final Properties PROPS = loadProperties();
 
+    static {
+        loadEnvFile();
+    }
+
     private Config() {}
+
+    /** Load .env from project root into system properties so Config getters see them (e.g. SLACK_BOT_TOKEN -> slack.bot.token). */
+    private static void loadEnvFile() {
+        Path envPath = Paths.get(System.getProperty("user.dir", ""), ".env");
+        if (!Files.isRegularFile(envPath)) return;
+        try (BufferedReader reader = Files.newBufferedReader(envPath)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                int eq = line.indexOf('=');
+                if (eq <= 0) continue;
+                String key = line.substring(0, eq).trim();
+                String value = line.substring(eq + 1).trim();
+                if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
+                if (key.isEmpty() || value.isEmpty()) continue;
+                String sysKey = key.toLowerCase().replace('_', '.');
+                if (key.startsWith("SLACK_")) sysKey = "slack." + key.substring(6).toLowerCase().replace('_', '.');
+                else if (key.equals("API_BASE_URI_PUBLIC")) sysKey = "api.base.uri.public";
+                else if (key.equals("API_BASE_URI_INTERNAL")) sysKey = "api.base.uri.internal";
+                else if (key.equals("PRIVATE_KEY")) sysKey = "private.key";
+                else if (key.equals("EOA_ADDRESS")) sysKey = "eoa.address";
+                else if (key.equals("MARKET_ID")) sysKey = "market.id";
+                else if (key.equals("SIG_SERVER_URL")) sysKey = "sig.server.url";
+                else if (key.equals("API_KEY")) sysKey = "api.key";
+                if (System.getProperty(sysKey) == null || System.getProperty(sysKey).isBlank())
+                    System.setProperty(sysKey, value);
+            }
+        } catch (IOException ignored) {
+            // .env optional
+        }
+    }
 
     private static Properties loadProperties() {
         Properties p = new Properties();

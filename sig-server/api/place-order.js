@@ -10,7 +10,7 @@ const SIGN_ORDER_URL = "http://localhost:5050/sign-order";
 const SIGN_CREATE_PROXY_URL = "http://localhost:5050/sign-create-proxy-mm";
 
 // MARKET + ORDER DETAILS — match working curl: hex market id in URL and body, same body shape (no user_id).
-const MARKET_ID = process.env.MARKET_ID || config.MARKET_ID || "0xfaa8c7e1fd82aa80aae5c8859c2bb54e01e69badd720605dff89494dd974b400";
+const MARKET_ID = process.env.MARKET_ID || config.MARKET_ID || "0xf83d64fbb43a9b199109a96fee6291fc66b9fe0a5cd38b0bd2901fd10d7f1900";
 const TOKEN_ID = process.env.TOKEN_ID || config.TOKEN_ID || "0x1234567890abcdef1234567890abcdef12345678";
 const PRICE = process.env.PLACE_ORDER_PRICE || "30";
 const QTY = process.env.PLACE_ORDER_QTY || "100";

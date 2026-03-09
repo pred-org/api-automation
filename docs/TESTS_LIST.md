@@ -21,7 +21,7 @@ Tests run via `mvn test` using `src/test/resources/suite.xml`. Order below match
 
 | Test method | Description |
 |-------------|-------------|
-| **AuthFlowTest.printAccessTokenForPostman** | Print access token for Postman (copy from output). |
+| **AuthFlowTest.printAccessTokenForPostman** | *(Utility, not counted.)* Print access token for Postman (copy from output); excluded from Slack and test count. |
 | **AuthFlowTest.verifyTokenStored** | Token is stored in TokenManager after login. |
 | **AuthFlowTest.loginWithInvalidSignature_returns4xx** | Login with invalid signature returns 4xx. |
 

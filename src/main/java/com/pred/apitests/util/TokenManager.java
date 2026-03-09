@@ -9,7 +9,7 @@ public final class TokenManager {
 
     private static final TokenManager INSTANCE = new TokenManager();
 
-    /** Consider token expiring soon after this many milliseconds (40 min). */
+    /** Consider token expiring soon after this many milliseconds (40 min). Refresh before access token expiry (e.g. 60 min) so long runs stay authenticated. */
     public static final long EXPIRY_THRESHOLD_MS = 40 * 60 * 1000L;
 
     private String accessToken;

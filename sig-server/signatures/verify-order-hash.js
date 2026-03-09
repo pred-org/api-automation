@@ -53,7 +53,7 @@ const getChecksumAddress = (addr) => {
 const wallet = config.PRIVATE_KEY ? new ethers.Wallet(config.PRIVATE_KEY) : null;
 const signerAddr = getChecksumAddress(wallet ? wallet.address : config.EOA_ADDRESS);
 const makerAddr = getChecksumAddress(config.PROXY || config.EOA_ADDRESS || signerAddr);
-const marketId = config.MARKET_ID || "0xfaa8c7e1fd82aa80aae5c8859c2bb54e01e69badd720605dff89494dd974b400";
+const marketId = config.MARKET_ID || "0xf83d64fbb43a9b199109a96fee6291fc66b9fe0a5cd38b0bd2901fd10d7f1900";
 const examplePrice = process.env.PLACE_ORDER_PRICE || "30";
 const exampleQty = process.env.PLACE_ORDER_QTY || "200";
 const priceWei = String(Math.round((Number(examplePrice) / 100) * 1e6));

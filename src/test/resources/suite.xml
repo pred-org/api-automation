@@ -3,8 +3,8 @@
 <suite name="API Automation Suite" verbose="1">
     <listeners>
         <listener class-name="com.pred.apitests.listeners.TestListener"/>
-        <!-- SlackNotificationListener disabled for now; re-add when you want suite summary in Slack -->
-        <!-- <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/> -->
+        <!-- Slack disabled for debugging; re-enable when ready: -->
+        <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/> 
     </listeners>
     <test name="API tests">
         <classes>
@@ -36,6 +36,21 @@
     <test name="Order">
         <classes>
             <class name="com.pred.apitests.test.OrderTest"/>
+        </classes>
+    </test>
+    <test name="Order Validation">
+        <classes>
+            <class name="com.pred.apitests.test.OrderValidationTest"/>
+        </classes>
+    </test>
+    <test name="Balance Service">
+        <classes>
+            <class name="com.pred.apitests.test.BalanceServiceTest"/>
+        </classes>
+    </test>
+    <test name="Balance Integrity">
+        <classes>
+            <class name="com.pred.apitests.test.BalanceIntegrityTest"/>
         </classes>
     </test>
 </suite>
