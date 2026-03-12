@@ -9,13 +9,13 @@
     <test name="API tests">
         <classes>
             <class name="com.pred.apitests.FrameworkSmokeTest"/>
-            <class name="com.pred.apitests.HealthCheckTest"/>
             <class name="com.pred.apitests.LoginTest"/>
         </classes>
     </test>
     <test name="Auth Flow">
         <classes>
             <class name="com.pred.apitests.test.AuthFlowTest"/>
+            <class name="com.pred.apitests.HealthCheckTest"/>
         </classes>
     </test>
     <test name="Enable Trading">
@@ -38,9 +38,19 @@
             <class name="com.pred.apitests.test.OrderTest"/>
         </classes>
     </test>
-    <test name="Order Validation">
+    <test name="Orderbook">
         <classes>
-            <class name="com.pred.apitests.test.OrderValidationTest"/>
+            <class name="com.pred.apitests.test.OrderbookTest"/>
+        </classes>
+    </test>
+    <test name="Cancel Order">
+        <classes>
+            <class name="com.pred.apitests.test.CancelOrderTest"/>
+        </classes>
+    </test>
+    <test name="Order Flow">
+        <classes>
+            <class name="com.pred.apitests.test.OrderFlowTest"/>
         </classes>
     </test>
     <test name="Balance Service">

@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 public final class SessionFileWriter {
 
     private static final String FILENAME = ".env.session";
+    private static final String FILENAME_USER2 = ".env.session2";
 
     private SessionFileWriter() {}
 
@@ -54,6 +55,41 @@ public final class SessionFileWriter {
                 + "export PROXY=" + escape(proxy) + "\n"
                 + eoaLine + "\n";
         Path path = Paths.get(System.getProperty("user.dir", ""), FILENAME);
+        try {
+            Files.writeString(path, body, StandardCharsets.UTF_8);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Write second user session to .env.session2 in project root (for two-user flows).
+     * Optional privateKey; if provided it is written so SecondUserContext can sign for user 2.
+     */
+    public static boolean writeSecondUser(String accessToken, String refreshCookie, String userId, String proxy, String eoa, String privateKey) {
+        if (accessToken == null || accessToken.isBlank() || userId == null || userId.isBlank()
+                || proxy == null || proxy.isBlank()) {
+            return false;
+        }
+        String cookieLine = (refreshCookie != null && !refreshCookie.isBlank())
+                ? "export REFRESH_COOKIE=" + escape(refreshCookie)
+                : "# export REFRESH_COOKIE not set";
+        String eoaLine = (eoa != null && !eoa.isBlank())
+                ? "export EOA=" + escape(eoa)
+                : "# export EOA not set";
+        String pkLine = (privateKey != null && !privateKey.isBlank())
+                ? "export PRIVATE_KEY=" + escape(privateKey)
+                : "# export PRIVATE_KEY not set (use PRIVATE_KEY_2 env or second.user.private.key)";
+        String body = ""
+                + "# Second user session (two-user flows). Do not commit.\n"
+                + "export ACCESS_TOKEN=" + escape(accessToken) + "\n"
+                + cookieLine + "\n"
+                + "export USER_ID=" + escape(userId) + "\n"
+                + "export PROXY=" + escape(proxy) + "\n"
+                + eoaLine + "\n"
+                + pkLine + "\n";
+        Path path = Paths.get(System.getProperty("user.dir", ""), FILENAME_USER2);
         try {
             Files.writeString(path, body, StandardCharsets.UTF_8);
             return true;

@@ -12,8 +12,12 @@ import java.util.UUID;
 public class PortfolioService extends BaseService {
 
     private static final String POSITIONS_PATH = "/api/v1/portfolio/positions";
+    private static final String POSITIONS_BY_MARKET_PATH = "/api/v1/portfolio/positions?market_id=%s";
     private static final String BALANCE_PATH = "/api/v1/portfolio/balance";
     private static final String BALANCE_BY_MARKET_PATH = "/api/v1/portfolio/balance?parent_market_id=%s&market_id=%s";
+    private static final String OPEN_ORDERS_PATH = "/api/v1/portfolio/open-orders";
+    private static final String TRADE_HISTORY_PATH = "/api/v1/portfolio/trade-history";
+    private static final String TRADE_HISTORY_BY_MARKET_PATH = "/api/v1/portfolio/trade-history?market_id=%s";
     private static final String PNL_PATH = "/api/v1/portfolio/pnl";
     private static final String EARNINGS_PATH = "/api/v1/portfolio/earnings";
     private static final String INTERNAL_BALANCE_PATH = "/api/v1/balance/info";
@@ -24,6 +28,15 @@ public class PortfolioService extends BaseService {
     public Response getPositions(String accessToken, String refreshCookie) {
         RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
         return spec.when().get(POSITIONS_PATH);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/positions?market_id={marketId}
+     */
+    public Response getPositionsByMarket(String accessToken, String refreshCookie, String marketId) {
+        String path = String.format(POSITIONS_BY_MARKET_PATH, marketId);
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(path);
     }
 
     /**
@@ -39,6 +52,34 @@ public class PortfolioService extends BaseService {
      */
     public Response getBalanceByMarket(String accessToken, String refreshCookie, String marketId) {
         String path = String.format(BALANCE_BY_MARKET_PATH, marketId, marketId);
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(path);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/open-orders
+     * Returns pending limit orders.
+     */
+    public Response getOpenOrders(String accessToken, String refreshCookie) {
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(OPEN_ORDERS_PATH);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/trade-history
+     * Returns all trades (activity: Open Long | Open Short | Redeemed; side, price, quantity, amount, pnl, matched_at).
+     */
+    public Response getTradeHistory(String accessToken, String refreshCookie) {
+        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
+        return spec.when().get(TRADE_HISTORY_PATH);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/portfolio/trade-history?market_id={marketId}
+     * Returns trades scoped to one market.
+     */
+    public Response getTradeHistoryByMarket(String accessToken, String refreshCookie, String marketId) {
+        String path = String.format(TRADE_HISTORY_BY_MARKET_PATH, marketId);
         RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
         return spec.when().get(path);
     }

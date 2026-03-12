@@ -4,6 +4,7 @@ import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.config.Config;
 import com.pred.apitests.model.request.PlaceOrderRequest;
 import com.pred.apitests.model.request.SignOrderRequest;
+import com.pred.apitests.model.response.BalanceResponse;
 import com.pred.apitests.model.response.SignOrderResponse;
 import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.PortfolioService;
@@ -15,6 +16,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 
 /**
  * Balance correctness around order placement. Discovers delta for price=30 qty=100.
@@ -59,7 +62,8 @@ public class BalanceServiceTest extends BaseApiTest {
         Response response = portfolioService.getBalance(token, cookie);
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
-        return Long.parseLong(usdc != null ? usdc.trim() : "0");
+        if (usdc == null || usdc.isBlank()) return 0L;
+        return parseBalanceAsLong(usdc);
     }
 
     private long getMarketBalance() {
@@ -67,7 +71,8 @@ public class BalanceServiceTest extends BaseApiTest {
         Response response = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
-        return Long.parseLong(usdc != null ? usdc.trim() : "0");
+        if (usdc == null || usdc.isBlank()) return 0L;
+        return parseBalanceAsLong(usdc);
     }
 
     private String placeOrder(String price, String qty) {
@@ -163,5 +168,112 @@ public class BalanceServiceTest extends BaseApiTest {
         this.discoveredDelta = actualDelta;
 
         cancelOrder(orderId);
+    }
+
+    @Test(description = "Place order with balance check before and after; balance should reflect open order")
+    public void placeOrder_balanceBeforeAndAfterReflectsOrder() {
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+        if (Config.getTokenId() == null || Config.getTokenId().isBlank()) throw new SkipException("TOKEN_ID not set");
+        if (eoa == null || eoa.isBlank() || proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("EOA or proxy not set");
+
+        Response balanceOverallBefore = portfolioService.getBalance(token, cookie);
+        Response balanceByMarketBefore = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        assertThat(balanceOverallBefore.getStatusCode()).isEqualTo(200);
+        assertThat(balanceByMarketBefore.getStatusCode()).isEqualTo(200);
+        balanceOverallBefore.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        balanceByMarketBefore.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+
+        BalanceResponse beforeByMarket = balanceByMarketBefore.as(BalanceResponse.class);
+        logBalance("BEFORE (by market)", beforeByMarket);
+
+        String orderId = placeOrder(ORDER_PRICE, ORDER_QUANTITY);
+        assertThat(orderId).isNotBlank();
+
+        Response balanceOverallAfter = portfolioService.getBalance(token, cookie);
+        Response balanceByMarketAfter = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        assertThat(balanceOverallAfter.getStatusCode()).isEqualTo(200);
+        assertThat(balanceByMarketAfter.getStatusCode()).isEqualTo(200);
+        long balanceBefore = parseBalanceAsLong(balanceByMarketBefore.path("usdc_balance").toString());
+        long balanceAfter = parseBalanceAsLong(balanceByMarketAfter.path("usdc_balance").toString());
+        assertThat(balanceAfter).isLessThan(balanceBefore);
+        assertThat(balanceBefore - balanceAfter).isGreaterThan(0);
+
+        BalanceResponse afterByMarket = balanceByMarketAfter.as(BalanceResponse.class);
+        logBalance("AFTER (by market)", afterByMarket);
+        assertBalanceReflectsOrder(beforeByMarket, afterByMarket, ORDER_AMOUNT);
+
+        cancelOrder(orderId);
+    }
+
+    @Test(description = "Balance: overall usdc_balance >= by-market usdc_balance; when total/available/reserved present, available = total - reserved")
+    public void balance_availableEqualsTotalMinusReserved_whenFieldsPresent() {
+        if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
+
+        Response overallRes = portfolioService.getBalance(token, cookie);
+        Response byMarketRes = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        assertThat(overallRes.getStatusCode()).isEqualTo(200);
+        assertThat(byMarketRes.getStatusCode()).isEqualTo(200);
+        overallRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+        byMarketRes.then().body("success", equalTo(true)).body("usdc_balance", notNullValue()).body("position_balance", notNullValue());
+
+        long overall = parseBalanceAsLong(overallRes.path("usdc_balance").toString());
+        long byMarket = parseBalanceAsLong(byMarketRes.path("usdc_balance").toString());
+        assertThat(overall).isGreaterThanOrEqualTo(byMarket);
+
+        assertAvailableEqualsTotalMinusReserved(overallRes.as(BalanceResponse.class));
+        assertAvailableEqualsTotalMinusReserved(byMarketRes.as(BalanceResponse.class));
+    }
+
+    private static void logBalance(String label, BalanceResponse b) {
+        if (b == null) return;
+        System.out.println("Balance " + label + ": success=" + b.isSuccess()
+                + " usdc_balance=" + b.getUsdcBalance()
+                + " position_balance=" + b.getPositionBalance()
+                + " reserved_balance=" + b.getReservedBalance()
+                + " available_balance=" + b.getAvailableBalance()
+                + " total_balance=" + b.getTotalBalance());
+    }
+
+    private static void assertBalanceReflectsOrder(BalanceResponse before, BalanceResponse after, String orderAmountStr) {
+        if (before == null || after == null) return;
+        long orderAmount = parseBalanceLong(orderAmountStr);
+        if (orderAmount < 0) return;
+
+        Long reservedBefore = parseBalanceLong(before.getReservedBalance());
+        Long reservedAfter = parseBalanceLong(after.getReservedBalance());
+        if (reservedBefore != null && reservedAfter != null) {
+            assertThat(reservedAfter).as("reserved_balance should increase after placing order").isGreaterThanOrEqualTo(reservedBefore);
+        }
+
+        Long availableBefore = parseBalanceLong(before.getAvailableBalance());
+        Long availableAfter = parseBalanceLong(after.getAvailableBalance());
+        if (availableBefore != null && availableAfter != null) {
+            assertThat(availableAfter).as("available_balance should decrease or stay same after placing order").isLessThanOrEqualTo(availableBefore);
+        }
+
+        Long usdcBefore = parseBalanceLong(before.getUsdcBalance());
+        Long usdcAfter = parseBalanceLong(after.getUsdcBalance());
+        if (usdcBefore != null && usdcAfter != null && reservedBefore == null && availableBefore == null) {
+            assertThat(usdcAfter).as("usdc_balance (by market) should decrease by order amount when reserved/available not returned").isEqualTo(usdcBefore - orderAmount);
+        }
+    }
+
+    private static void assertAvailableEqualsTotalMinusReserved(BalanceResponse b) {
+        if (b == null) return;
+        Long total = parseBalanceLong(b.getTotalBalance());
+        Long available = parseBalanceLong(b.getAvailableBalance());
+        Long reserved = parseBalanceLong(b.getReservedBalance());
+        if (total != null && available != null && reserved != null) {
+            assertThat(available).as("available_balance should equal total_balance - reserved_balance").isEqualTo(total - reserved);
+        }
+    }
+
+    private static Long parseBalanceLong(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return (long) Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

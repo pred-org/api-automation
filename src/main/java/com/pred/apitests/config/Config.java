@@ -44,6 +44,8 @@ public final class Config {
                 else if (key.equals("API_BASE_URI_INTERNAL")) sysKey = "api.base.uri.internal";
                 else if (key.equals("PRIVATE_KEY")) sysKey = "private.key";
                 else if (key.equals("EOA_ADDRESS")) sysKey = "eoa.address";
+                else if (key.equals("PRIVATE_KEY_2")) sysKey = "second.user.private.key";
+                else if (key.equals("EOA_ADDRESS_2")) sysKey = "second.user.eoa";
                 else if (key.equals("MARKET_ID")) sysKey = "market.id";
                 else if (key.equals("SIG_SERVER_URL")) sysKey = "sig.server.url";
                 else if (key.equals("API_KEY")) sysKey = "api.key";
@@ -134,6 +136,24 @@ public final class Config {
                 System.getProperty("private.key"),
                 System.getenv("PRIVATE_KEY"),
                 PROPS.getProperty("private.key")
+        );
+    }
+
+    /** Second user private key (for two-user flows). Env PRIVATE_KEY_2 or property second.user.private.key. */
+    public static String getSecondUserPrivateKey() {
+        return firstNonBlank(
+                System.getProperty("second.user.private.key"),
+                System.getenv("PRIVATE_KEY_2"),
+                PROPS.getProperty("second.user.private.key")
+        );
+    }
+
+    /** Second user EOA (optional override when loading from .env.session2). Env EOA_ADDRESS_2 or property second.user.eoa. */
+    public static String getSecondUserEoa() {
+        return firstNonBlank(
+                System.getProperty("second.user.eoa"),
+                System.getenv("EOA_ADDRESS_2"),
+                PROPS.getProperty("second.user.eoa")
         );
     }
 

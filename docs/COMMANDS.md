@@ -13,6 +13,19 @@ Important commands used in this project, with short descriptions. Run from the p
 
 ---
 
+## Two users (place both sides so orders can match -> positions)
+
+Use a second wallet/session so user 1 places long and user 2 places short at the same price; when they match you get positions (not just open orders). Enables testing position and PnL flows later.
+
+| Command / env | Description |
+|---------------|-------------|
+| Set second user env | After auth for the second wallet, set: `USER_2_ACCESS_TOKEN`, `USER_2_EOA`, `USER_2_PROXY`, `USER_2_USER_ID` (optional `USER_2_REFRESH_COOKIE`). Source .env.session for user 1, then export USER_2_* from a second .env or manual export. |
+| `source .env.session && export USER_2_ACCESS_TOKEN=... USER_2_EOA=... USER_2_PROXY=... USER_2_USER_ID=... && K6_MODE=smoke K6_VUS=10 k6 run k6/place-cancel-rate-limit.js` | Two-user smoke: even iterations use user 1 (long), odd use user 2 (short). Same price so orders may match. |
+| `K6_USER_1_SIDE=long K6_USER_2_SIDE=short` | Default: user 1 = long, user 2 = short. Override if needed. |
+| Sig-server | Must be able to sign for both wallets (e.g. sign-order called with maker/signer per user). Configure or run auth for the second wallet so sig-server has the second key. |
+
+---
+
 ## Place + Cancel together (one place, then cancel that order)
 
 Each iteration: sign -> place order -> read order_id from response -> cancel that order.
@@ -94,3 +107,5 @@ Place for 10 s to build order IDs, then cancel all at target RPS (e.g. 30/s). Si
 | `place_only` | Place only for 60 s; no cancel. |
 | `cancel_only` | Setup places to build IDs (or use file); then 60 s cancel at target RPS. |
 | `cancel_burst` | Place 10 s then cancel at target RPS. |
+
+With two users set (USER_2_*), smoke/load/spike/place_only alternate user 1 (long) and user 2 (short) so orders can match and create positions.

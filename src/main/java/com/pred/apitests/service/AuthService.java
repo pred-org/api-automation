@@ -95,7 +95,7 @@ public class AuthService extends BaseService {
     /**
      * Try common JSON paths for access token when POJO mapping misses it (e.g. different key or nesting).
      */
-    private String extractAccessTokenFromResponse(Response response) {
+    public String extractAccessTokenFromResponse(Response response) {
         try {
             var json = response.jsonPath();
             String[] paths = { "access_token", "data.access_token", "data.data.access_token", "data.token", "token" };
@@ -120,7 +120,7 @@ public class AuthService extends BaseService {
     /**
      * Fill userId and proxyWalletAddress on parsed from JsonPath when POJO left them null.
      */
-    private void fillLoginResponseFromJsonPath(Response response, LoginResponse parsed) {
+    public void fillLoginResponseFromJsonPath(Response response, LoginResponse parsed) {
         if (parsed.getUserId() != null && parsed.getProxyWalletAddress() != null) return;
         try {
             var json = response.jsonPath();

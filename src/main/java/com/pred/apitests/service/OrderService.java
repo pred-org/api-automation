@@ -8,12 +8,13 @@ import io.restassured.specification.RequestSpecification;
 import java.util.Map;
 
 /**
- * Place order and cancel order APIs.
+ * Place order, cancel order, and orderbook (public) APIs.
  */
 public class OrderService extends BaseService {
 
     private static final String PLACE_ORDER_PATH_TEMPLATE = "/api/v1/order/%s/place";
     private static final String CANCEL_ORDER_PATH_TEMPLATE = "/api/v1/order/%s/cancel";
+    private static final String ORDERBOOK_PATH_TEMPLATE = "/api/v1/order/%s/orderbook/%s";
 
     /**
      * POST {publicBase}/api/v1/order/{marketId}/place
@@ -39,5 +40,15 @@ public class OrderService extends BaseService {
         );
         RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, refreshCookie);
         return spec.body(body).when().delete(path);
+    }
+
+    /**
+     * GET {publicBase}/api/v1/order/{marketId}/orderbook/{marketId}
+     * Public (no auth). Returns bids[], asks[], metadata: { spread, mid_price, total_bid_quantity, total_ask_quantity }.
+     */
+    public Response getOrderbook(String marketId) {
+        String path = String.format(ORDERBOOK_PATH_TEMPLATE, marketId, marketId);
+        RequestSpecification spec = given(getPublicBaseUri());
+        return spec.when().get(path);
     }
 }

@@ -31,6 +31,7 @@
  *   node scripts/place-only-to-file.js   (prints the exact K6_ORDER_IDS_FILE=... command to run)
  *   K6_ORDER_IDS_FILE=<absolute-path> K6_MODE=cancel_only k6 run k6/place-cancel-rate-limit.js
  *   (k6 resolves K6_ORDER_IDS_FILE relative to the script dir; use the absolute path printed by place-only-to-file.js.)
+ * Two users (place both sides to get matches -> positions): set USER_2_ACCESS_TOKEN, USER_2_EOA, USER_2_PROXY, USER_2_USER_ID (optional USER_2_REFRESH_COOKIE). User 1 = long, User 2 = short by default (K6_USER_1_SIDE, K6_USER_2_SIDE to override).
  * Include consumer lag / kadek in report:  K6_CONSUMER_LAG="..."  or  K6_REPORT_EXTRA="..."
  * Fetch lag from Kadek UAT API:  KADEK_LAG_URL="https://kadek-uat.../api/consumer-groups/.../lags"  (optional KADEK_LAG_AUTH_HEADER="Bearer ...")
  *
@@ -78,6 +79,10 @@ const cancelBurstRPS = Math.max(1, parseInt(__ENV.K6_CANCEL_BURST_RPS || "30", 1
 const placePhaseSec = Math.max(1, parseInt(__ENV.K6_PLACE_PHASE_SEC || "10", 10));
 const cancelOnlyPlaceSec = Math.max(1, parseInt(__ENV.K6_CANCEL_ONLY_PLACE_SEC || "120", 10));
 const ORDER_IDS_CHUNK_SIZE = 100;
+
+const user1Side = (__ENV.K6_USER_1_SIDE || "long").toLowerCase();
+const user2Side = (__ENV.K6_USER_2_SIDE || "short").toLowerCase();
+const twoUserMode = !!(__ENV.USER_2_ACCESS_TOKEN && __ENV.USER_2_EOA && __ENV.USER_2_PROXY && __ENV.USER_2_USER_ID);
 
 // When cancel_only and K6_ORDER_IDS_FILE is set, load order IDs in init to avoid setup payload limits (~400 IDs).
 // File must be a JSON array of order ID strings, e.g. ["id1","id2",...]. Create it externally or use a helper script.
@@ -171,13 +176,30 @@ export function setup() {
   }
 
   const cookie = refreshCookie || "";
-  const placeHeaders = {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer " + accessToken,
-    "X-Wallet-Address": eoa,
-    "X-Proxy-Address": proxy,
-  };
-  if (cookie) placeHeaders["Cookie"] = cookie;
+  function buildPlaceHeaders(accessTok, refCookie, eoaAddr, proxyAddr) {
+    const h = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + accessTok,
+      "X-Wallet-Address": eoaAddr,
+      "X-Proxy-Address": proxyAddr,
+    };
+    if (refCookie) h["Cookie"] = refCookie;
+    return h;
+  }
+  const placeHeaders = buildPlaceHeaders(accessToken, cookie, eoa, proxy);
+  const user1 = { placeHeaders, userId, eoa, proxy, side: user1Side };
+
+  let user2 = null;
+  if (twoUserMode) {
+    const ref2 = __ENV.USER_2_REFRESH_COOKIE || "";
+    user2 = {
+      placeHeaders: buildPlaceHeaders(__ENV.USER_2_ACCESS_TOKEN, ref2, __ENV.USER_2_EOA, __ENV.USER_2_PROXY),
+      userId: __ENV.USER_2_USER_ID,
+      eoa: __ENV.USER_2_EOA,
+      proxy: __ENV.USER_2_PROXY,
+      side: user2Side,
+    };
+  }
 
   if (mode === "cancel_only" && __ENV.K6_ORDER_IDS_FILE && fileOrderIds.length > 0) {
     return {
@@ -339,7 +361,12 @@ export function setup() {
     throw new Error(`cancel-order failed: ${cancelRes.status}. Body: ${cancelRes.body?.slice(0, 200) || "(none)"}`);
   }
 
-  return { accessToken, refreshCookie: cookie, eoa, proxy, userId };
+  const out = { accessToken, refreshCookie: cookie, eoa, proxy, userId };
+  if (twoUserMode && user2) {
+    out.users = [user1, user2];
+    out.twoUser = true;
+  }
+  return out;
 }
 
 export default function (data) {
@@ -405,7 +432,25 @@ export default function (data) {
     return;
   }
 
-  const { accessToken, refreshCookie, eoa, proxy, userId } = data;
+  if (data.twoUser && __ITER === 0 && __VU === 1) {
+    console.log("two-user mode: user1=" + (data.users[0].side) + ", user2=" + (data.users[1].side) + " (orders may match -> positions)");
+  }
+  const currentUser = data.twoUser && data.users && data.users.length >= 2
+    ? data.users[__ITER % 2]
+    : {
+        placeHeaders: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + data.accessToken,
+          "X-Wallet-Address": data.eoa,
+          "X-Proxy-Address": data.proxy,
+          ...(data.refreshCookie ? { "Cookie": data.refreshCookie } : {}),
+        },
+        userId: data.userId,
+        eoa: data.eoa,
+        proxy: data.proxy,
+        side: user1Side,
+      };
+  const { placeHeaders: userPlaceHeaders, userId, eoa, proxy, side } = currentUser;
 
   const salt = String(Date.now()) + String(Math.floor(Math.random() * 10000000));
   const timestamp = Math.floor(Date.now() / 1000);
@@ -449,7 +494,7 @@ export default function (data) {
     salt,
     user_id: userId,
     market_id: MARKET_ID,
-    side: "long",
+    side,
     token_id: TOKEN_ID,
     price: PRICE,
     quantity: QTY,
@@ -462,19 +507,11 @@ export default function (data) {
     fee_rate_bps: 0,
   });
 
-  const placeHeaders = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${accessToken}`,
-    "X-Wallet-Address": eoa,
-    "X-Proxy-Address": proxy,
-  };
-  if (refreshCookie) placeHeaders["Cookie"] = refreshCookie;
-
   placeOrderAttempts.add(1);
   const placeRes = http.post(
     `${BASE_URL}/api/v1/order/${MARKET_ID}/place`,
     placeBody,
-    { headers: placeHeaders, tags: { name: "place-order" } }
+    { headers: userPlaceHeaders, tags: { name: "place-order" } }
   );
   placeOrderLatency.add(placeRes.timings.duration);
   if (placeRes.status >= 200 && placeRes.status < 300) {
@@ -518,7 +555,7 @@ export default function (data) {
   const cancelRes = http.del(
     `${BASE_URL}/api/v1/order/${MARKET_ID}/cancel`,
     cancelBody,
-    { headers: placeHeaders, tags: { name: "cancel-order" } }
+    { headers: userPlaceHeaders, tags: { name: "cancel-order" } }
   );
   cancelOrderLatency.add(cancelRes.timings.duration);
   if (cancelRes.status >= 200 && cancelRes.status < 300) {

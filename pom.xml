@@ -101,6 +101,8 @@
                     <suiteXmlFiles>
                         <suiteXmlFile>${suite}</suiteXmlFile>
                     </suiteXmlFiles>
+                    <!-- Single JVM so TokenManager (and .env.session) from AuthFlowTest is visible to later test classes -->
+                    <forkCount>0</forkCount>
                 </configuration>
             </plugin>
             <plugin>

@@ -55,7 +55,8 @@ public class BalanceIntegrityTest extends BaseApiTest {
         Response response = portfolioService.getBalance(token, cookie);
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
-        return Long.parseLong(usdc != null ? usdc.trim() : "0");
+        if (usdc == null || usdc.isBlank()) return 0L;
+        return parseBalanceAsLong(usdc);
     }
 
     private long getMarketBalance() {
@@ -63,7 +64,8 @@ public class BalanceIntegrityTest extends BaseApiTest {
         Response response = portfolioService.getBalanceByMarket(token, cookie, marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
-        return Long.parseLong(usdc != null ? usdc.trim() : "0");
+        if (usdc == null || usdc.isBlank()) return 0L;
+        return parseBalanceAsLong(usdc);
     }
 
     private String placeOrder(String price, String qty) {
