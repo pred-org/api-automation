@@ -1,4 +1,5 @@
 # API Automation (RestAssured)
+<!-- Maintained by Abhishek Mishra -->
 
 RestAssured-based API test project. **TestNG** for tests; **GitHub Actions** for CI/CD (when enabled).
 
