@@ -21,6 +21,7 @@ logs/
 .env
 .env.local
 .env.session
+.env.session2
 .env.*.local
 scripts/set_env.sh
 
@@ -32,9 +33,14 @@ allure-report/
 sig-server/node_modules/
 sig-server/config.js
 
+market-smoke-server/node_modules/
+
 # Local backup bundles (do not commit)
 *.bundle
 
 # OS
 .DS_Store
 Thumbs.db
+
+docs/
+documents/
