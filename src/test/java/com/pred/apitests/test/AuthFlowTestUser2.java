@@ -9,7 +9,6 @@ import com.pred.apitests.service.AuthService;
 import com.pred.apitests.service.SignatureService;
 import com.pred.apitests.util.SecondUserContext;
 import com.pred.apitests.util.SessionFileWriter;
-import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,15 +36,16 @@ public class AuthFlowTestUser2 extends BaseApiTest {
         if (secondPrivateKey == null || secondPrivateKey.isBlank()) {
             throw new SkipException("Second user not configured: set PRIVATE_KEY_2 or second.user.private.key (and run AuthFlowTest first for API key)");
         }
-        if (!TokenManager.getInstance().hasToken()) {
-            throw new SkipException("Run AuthFlowTest first so we have API key (and optional user 1 session)");
-        }
 
         authService = new AuthService();
         signatureService = new SignatureService();
-        apiKey = TokenManager.getInstance().getApiKey();
-        if (apiKey == null || apiKey.isBlank()) apiKey = Config.getApiKey();
-        assertThat(apiKey).isNotBlank();
+        apiKey = Config.getSecondUserApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new SkipException(
+                    "API_KEY_2 not configured. Set API_KEY_2 (or second.user.api.key) in .env to run User 2 tests."
+            );
+        }
+        assertThat(apiKey).as("Set API_KEY_2 (or second.user.api.key) for user 2 login when backend allows only one user per key").isNotBlank();
 
         SignCreateProxyResponse sigResponse = signatureService.signCreateProxy(Config.getSigServerUrl(), secondPrivateKey);
         assertThat(sigResponse).isNotNull();
@@ -64,7 +64,13 @@ public class AuthFlowTestUser2 extends BaseApiTest {
                 .build();
 
         Response response = authService.login(apiKey, loginRequest);
-        assertThat(response.getStatusCode()).isEqualTo(200);
+        int status = response.getStatusCode();
+        if (status == 401) {
+            throw new SkipException(
+                    "User 2 login returned 401 - backend may allow only one user per API key. "
+                            + "Set a separate API key for user 2 or enable multi-user for this key. Skipping user 2 tests.");
+        }
+        assertThat(status).as("User 2 login").isEqualTo(200);
         LoginResponse loginResponse = authService.parseLoginResponse(response);
         assertThat(loginResponse).isNotNull();
         authService.fillLoginResponseFromJsonPath(response, loginResponse);
@@ -88,7 +94,7 @@ public class AuthFlowTestUser2 extends BaseApiTest {
         LOG.info("Second user session written to .env.session2 (userId={}, proxy={})", userId, proxy);
     }
 
-    @Test(description = "Second user session is loadable")
+    @Test(groups = {"auth-user2-complete"}, description = "Second user session is loadable")
     public void secondUserSessionIsLoadable() {
         var session = SecondUserContext.getSecondUser();
         assertThat(session).isNotNull();

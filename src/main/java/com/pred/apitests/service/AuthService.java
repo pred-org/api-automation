@@ -1,7 +1,10 @@
 package com.pred.apitests.service;
 
 import com.pred.apitests.config.Config;
+import com.pred.apitests.util.SecondUserContext;
+import com.pred.apitests.util.SessionFileWriter;
 import com.pred.apitests.util.TokenManager;
+import com.pred.apitests.util.UserSession;
 import com.pred.apitests.base.BaseService;
 import com.pred.apitests.model.request.LoginRequest;
 import com.pred.apitests.model.response.LoginResponse;
@@ -19,6 +22,7 @@ public class AuthService extends BaseService {
 
     private static final String LOGIN_PATH = "/api/v1/auth/login-with-signature";
     private static final String CREATE_API_KEY_PATH = "/api/v1/auth/internal/api-key/create";
+    private static final String REFRESH_TOKEN_PATH = "/api/v1/auth/refresh/token";
     private static final String COOKIE_HEADER = "Cookie";
     private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 
@@ -43,6 +47,18 @@ public class AuthService extends BaseService {
         } catch (Exception ignored) { }
         String body = response.getBody().asString();
         return (body != null && !body.isBlank()) ? body.trim() : null;
+    }
+
+    /**
+     * POST /auth/refresh/token with Cookie: refresh_token=... Returns new access_token in body (e.g. data.access_token or access_token).
+     */
+    public Response refreshToken(String refreshCookieValue) {
+        if (refreshCookieValue == null || refreshCookieValue.isBlank()) return null;
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put(COOKIE_HEADER, refreshCookieValue);
+        String base = getPublicBaseUri();
+        return post(base, REFRESH_TOKEN_PATH, "{}", headers);
     }
 
     /**
@@ -172,24 +188,39 @@ public class AuthService extends BaseService {
     }
 
     /**
-     * Refresh access token by re-calling login with stored refresh cookie. Caller must supply apiKey and login body (e.g. from sig-server).
-     * Returns true if TokenManager.isTokenExpiringSoon() and login with cookie succeeded and store updated.
+     * User 1: POST /auth/refresh/token with stored refresh cookie. Fast path when access token is rejected (401) but cookie is valid.
      */
-    public boolean refresh(String apiKey, LoginRequest loginBody) {
+    public boolean refreshAccessTokenFromRefreshCookie() {
         TokenManager tm = TokenManager.getInstance();
-        if (!tm.isTokenExpiringSoon() || tm.getRefreshCookieHeaderValue().isBlank()) return false;
-        Response response = login(apiKey, loginBody, tm.getRefreshCookieHeaderValue());
-        return loginAndStoreFromResponse(response) != null;
+        String cookieHeader = tm.getRefreshCookieHeaderValue();
+        if (cookieHeader == null || cookieHeader.isBlank()) {
+            return false;
+        }
+        Response response = refreshToken(cookieHeader);
+        if (response == null || response.getStatusCode() != 200) {
+            return false;
+        }
+        String newToken = extractAccessTokenFromResponse(response);
+        if (newToken == null || newToken.isBlank()) {
+            return false;
+        }
+        String newRefreshRaw = extractRefreshTokenFromResponse(response);
+        if (newRefreshRaw != null && !newRefreshRaw.isBlank()) {
+            tm.setFromLoginWithRefresh(newToken, newRefreshRaw, tm.getUserId(), tm.getProxyWalletAddress(), tm.getEoa(), tm.getPrivateKey());
+        } else {
+            tm.setAccessToken(newToken);
+            tm.setTokenSetAtMs(System.currentTimeMillis());
+        }
+        return true;
     }
 
     /**
-     * Proactive refresh: if token is expiring soon (e.g. after 40 min), get new access token via refresh cookie.
-     * Uses stored apiKey and sig-server for a fresh login body. Restores EOA and privateKey after refresh.
-     * Call from @BeforeMethod so long runs stay authenticated. No-op if no token, not expiring soon, or no refresh cookie.
+     * User 1: full login-with-signature using stored refresh cookie (no "expiring soon" gate).
+     * Use when 401 persists after {@link #refreshAccessTokenFromRefreshCookie()} or refresh endpoint is unavailable.
      */
-    public boolean refreshIfExpiringSoon() {
+    public boolean loginWithRefreshCookieAndStore() {
         TokenManager tm = TokenManager.getInstance();
-        if (!tm.hasToken() || !tm.isTokenExpiringSoon() || tm.getRefreshCookieHeaderValue().isBlank()) {
+        if (!tm.hasToken() || tm.getRefreshCookieHeaderValue().isBlank()) {
             return false;
         }
         String apiKey = tm.getApiKey();
@@ -218,11 +249,66 @@ public class AuthService extends BaseService {
                 .chainType("base-sepolia")
                 .timestamp(now / 1000)
                 .build();
-        boolean ok = refresh(apiKey, loginRequest);
+        Response response = login(apiKey, loginRequest, tm.getRefreshCookieHeaderValue());
+        boolean ok = loginAndStoreFromResponse(response) != null;
         if (ok && (eoa != null || privateKey != null)) {
-            if (eoa != null && !eoa.isBlank()) tm.setEoa(eoa);
-            if (privateKey != null && !privateKey.isBlank()) tm.setPrivateKey(privateKey);
+            if (eoa != null && !eoa.isBlank()) {
+                tm.setEoa(eoa);
+            }
+            if (privateKey != null && !privateKey.isBlank()) {
+                tm.setPrivateKey(privateKey);
+            }
         }
         return ok;
+    }
+
+    /**
+     * After a 401 on user 1, try refresh endpoint then full cookie login. Unlike {@link #refreshIfExpiringSoon()}, does not require token age &gt; 40 min.
+     */
+    public boolean refreshUser1SessionAfter401() {
+        if (refreshAccessTokenFromRefreshCookie()) {
+            return true;
+        }
+        return loginWithRefreshCookieAndStore();
+    }
+
+    /**
+     * Proactive refresh: if token is expiring soon (e.g. after 40 min), get new access token via refresh cookie.
+     * Uses stored apiKey and sig-server for a fresh login body. Restores EOA and privateKey after refresh.
+     * Call from @BeforeMethod so long runs stay authenticated. No-op if no token, not expiring soon, or no refresh cookie.
+     */
+    public boolean refreshIfExpiringSoon() {
+        TokenManager tm = TokenManager.getInstance();
+        if (!tm.hasToken() || !tm.isTokenExpiringSoon() || tm.getRefreshCookieHeaderValue().isBlank()) {
+            return false;
+        }
+        return loginWithRefreshCookieAndStore();
+    }
+
+    /**
+     * Refresh User 2's access token via POST /auth/refresh/token using User 2's refresh cookie,
+     * then write new session to .env.session2 and clear SecondUserContext cache.
+     * Call from suite (e.g. BaseApiTest) so User 2 stays valid during long runs.
+     * @return true if User 2 was present, had refresh cookie, refresh returned 200, and session was written
+     */
+    public boolean refreshSecondUserAndStore() {
+        UserSession user2 = SecondUserContext.getSecondUser();
+        if (user2 == null || !user2.hasToken()) return false;
+        String cookie = user2.getRefreshCookieHeaderValue();
+        if (cookie == null || cookie.isBlank()) return false;
+        Response response = refreshToken(cookie);
+        if (response == null || response.getStatusCode() != 200) return false;
+        String newToken = extractAccessTokenFromResponse(response);
+        if (newToken == null || newToken.isBlank()) return false;
+        String newRefreshRaw = extractRefreshTokenFromResponse(response);
+        String newRefresh = (newRefreshRaw != null && !newRefreshRaw.isBlank())
+                ? ("refresh_token=" + newRefreshRaw)
+                : cookie;
+        boolean written = SessionFileWriter.writeSecondUser(
+                newToken, newRefresh, user2.getUserId(), user2.getProxy(),
+                user2.getEoa() != null ? user2.getEoa() : "",
+                user2.getPrivateKey() != null ? user2.getPrivateKey() : "");
+        if (written) SecondUserContext.clear();
+        return written;
     }
 }

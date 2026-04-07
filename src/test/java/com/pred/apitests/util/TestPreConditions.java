@@ -23,9 +23,10 @@ public final class TestPreConditions {
      * Returns true if orderbook has at least one bid with quantity > 0.
      * Pre-condition for SHORT market order tests.
      */
-    public static boolean hasBidLiquidity(String marketId) {
-        if (marketId == null || marketId.isBlank()) return false;
-        Response res = ORDER_SERVICE.getOrderbook(marketId);
+    public static boolean hasBidLiquidity(String parentMarketId, String subMarketId) {
+        if (parentMarketId == null || parentMarketId.isBlank()) return false;
+        if (subMarketId == null || subMarketId.isBlank()) return false;
+        Response res = ORDER_SERVICE.getOrderbook(parentMarketId, subMarketId);
         if (res.getStatusCode() != 200) return false;
         List<?> bids = res.path("bids");
         if (bids == null || bids.isEmpty()) return false;

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [ "success", "usdc_balance", "position_balance" ],
+  "properties": {
+    "success": { "type": "boolean" },
+    "usdc_balance": { "oneOf": [ { "type": "string" }, { "type": "number" } ] },
+    "position_balance": { "oneOf": [ { "type": "string" }, { "type": "number" } ] },
+    "reserved_balance": {},
+    "available_balance": {},
+    "total_balance": {}
+  },
+  "additionalProperties": true
+}

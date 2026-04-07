@@ -30,9 +30,6 @@ public class SlackNotificationListener implements ISuiteListener {
     private static final Logger LOG = LoggerFactory.getLogger(SlackNotificationListener.class);
     private static final String SLACK_POST_MESSAGE = "https://slack.com/api/chat.postMessage";
     private static final ObjectMapper JSON = new ObjectMapper();
-    /** Excluded from Slack count and thread (utility that only prints token for Postman). */
-    private static final String EXCLUDE_FROM_REPORT = "printAccessTokenForPostman";
-
     @Override
     public void onFinish(ISuite suite) {
         String botToken = Config.getSlackBotToken();
@@ -77,7 +74,6 @@ public class SlackNotificationListener implements ISuiteListener {
         if (results == null) return;
         for (ITestResult r : results) {
             String name = r.getMethod() != null ? r.getMethod().getMethodName() : "unknown";
-            if (EXCLUDE_FROM_REPORT.equals(name)) continue;
             Throwable th = r.getThrowable();
             String failReason = (status == ITestResult.FAILURE && th != null)
                     ? toOneLiner(th)

@@ -1,31 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
-<suite name="API Automation Suite" verbose="1">
+<suite name="API Automation Suite" verbose="1" parallel="methods" thread-count="3">
     <listeners>
         <listener class-name="com.pred.apitests.listeners.TestListener"/>
         <!-- Slack disabled for debugging; re-enable when ready: -->
-        <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/> 
+      <!-- <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/>  -->
     </listeners>
-    <test name="API tests">
+    <test name="API tests" parallel="false">
         <classes>
             <class name="com.pred.apitests.FrameworkSmokeTest"/>
             <class name="com.pred.apitests.LoginTest"/>
         </classes>
     </test>
-    <test name="Auth Flow">
+    <test name="Auth Flow" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.AuthFlowTest"/>
             <class name="com.pred.apitests.HealthCheckTest"/>
         </classes>
     </test>
-    <test name="Enable Trading">
+    <test name="Enable Trading" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.EnableTradingTest"/>
         </classes>
     </test>
-    <test name="Deposit">
+    <test name="Auth Flow User 2" parallel="false">
+        <classes>
+            <class name="com.pred.apitests.test.AuthFlowTestUser2"/>
+        </classes>
+    </test>
+    <test name="Enable Trading User 2" parallel="false">
+        <classes>
+            <class name="com.pred.apitests.test.EnableTradingTestUser2"/>
+        </classes>
+    </test>
+    <test name="Deposit" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.DepositTest"/>
+            <class name="com.pred.apitests.test.DepositTestUser2"/>
         </classes>
     </test>
     <test name="Portfolio">
@@ -33,9 +44,10 @@
             <class name="com.pred.apitests.test.PortfolioTest"/>
         </classes>
     </test>
-    <test name="Order">
+    <test name="Order" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.OrderTest"/>
+            <class name="com.pred.apitests.test.OrderTestUser2"/>
         </classes>
     </test>
     <test name="Orderbook">
@@ -43,22 +55,35 @@
             <class name="com.pred.apitests.test.OrderbookTest"/>
         </classes>
     </test>
-    <test name="Cancel Order">
+    <test name="Market Discovery">
         <classes>
-            <class name="com.pred.apitests.test.CancelOrderTest"/>
+            <class name="com.pred.apitests.test.MarketDiscoveryTest"/>
         </classes>
     </test>
-    <test name="Order Flow">
+    <test name="Cancel Order" parallel="false">
+        <classes>
+            <class name="com.pred.apitests.test.CancelOrderTest"/>
+            <class name="com.pred.apitests.test.CancelOrderTestUser2"/>
+            <class name="com.pred.apitests.test.BalanceReservationTest"/>
+            <class name="com.pred.apitests.test.CancelAllOrdersTest"/>
+        </classes>
+    </test>
+    <test name="Order Flow" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.OrderFlowTest"/>
         </classes>
     </test>
-    <test name="Balance Service">
+    <test name="Close Position" parallel="false">
+        <classes>
+            <class name="com.pred.apitests.test.ClosePositionTest"/>
+        </classes>
+    </test>
+    <test name="Balance Service" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.BalanceServiceTest"/>
         </classes>
     </test>
-    <test name="Balance Integrity">
+    <test name="Balance Integrity" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.BalanceIntegrityTest"/>
         </classes>

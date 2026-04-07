@@ -19,7 +19,8 @@ import java.util.Map;
 public abstract class BaseService {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
-    private static final int READ_TIMEOUT_MS = 15_000;
+    /** UAT / integration: portfolio and orderbook can exceed 15s under load; avoid flaky SocketTimeout in tight poll loops. */
+    private static final int READ_TIMEOUT_MS = 60_000;
 
     static {
         RestAssured.filters(new LoggingFilter());

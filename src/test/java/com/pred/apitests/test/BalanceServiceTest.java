@@ -9,6 +9,7 @@ import com.pred.apitests.model.response.SignOrderResponse;
 import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.PortfolioService;
 import com.pred.apitests.service.SignatureService;
+import com.pred.apitests.util.MarketContext;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.testng.SkipException;
@@ -37,8 +38,9 @@ public class BalanceServiceTest extends BaseApiTest {
     private String proxyWallet;
     private String userId;
     private String marketId;
+    private String parentMarketId;
 
-    /** Discovered delta from balance_decreaseIsConsistentWithOrderSize (price=30, qty=100). */
+    /** Discovered delta from placeOrder_balanceDecreasesCorrectly (price=30, qty=100). */
     private long discoveredDelta;
 
     @BeforeClass
@@ -55,7 +57,13 @@ public class BalanceServiceTest extends BaseApiTest {
         if (eoa == null || eoa.isBlank()) eoa = Config.getEoaAddress();
         proxyWallet = TokenManager.getInstance().getProxyWalletAddress();
         userId = TokenManager.getInstance().getUserId();
-        marketId = Config.getMarketId();
+        try {
+            MarketContext.getInstance().init();
+        } catch (Exception e) {
+            System.out.println("MarketContext init skipped: " + e.getMessage());
+        }
+        marketId = MarketContext.resolveMarketId();
+        parentMarketId = MarketContext.resolveParentMarketIdForPath();
     }
 
     private long getOverallBalance() {
@@ -113,7 +121,7 @@ public class BalanceServiceTest extends BaseApiTest {
                 .tokenId(tokenId)
                 .price(price)
                 .quantity(qty)
-                .amount(price)
+                .amount(String.format("%.2f", Long.parseLong(price) * Long.parseLong(qty) / 100.0))
                 .isLowPriority(false)
                 .signature(sigResponse.getSignature())
                 .type("limit")
@@ -121,7 +129,7 @@ public class BalanceServiceTest extends BaseApiTest {
                 .reduceOnly(false)
                 .feeRateBps(0)
                 .build();
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, parentMarketId, orderBody);
         assertThat(response.getStatusCode()).isEqualTo(202);
         String orderId = response.jsonPath().getString("order_id");
         return orderId != null ? orderId.trim() : "";
@@ -129,12 +137,12 @@ public class BalanceServiceTest extends BaseApiTest {
 
     private void cancelOrder(String orderId) {
         if (orderId == null || orderId.isBlank()) return;
-        Response r = orderService.cancelOrder(token, cookie, marketId, orderId);
+        Response r = orderService.cancelOrder(token, cookie, parentMarketId, orderId);
         assertThat(r.getStatusCode()).as("cancel order").isBetween(200, 299);
     }
 
     @Test(description = "Balance restores after cancelling order; exact equality with 2s wait")
-    public void balance_restoresAfterCancellingOrder() {
+    public void cancelOrder_balanceRestores() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         long before = getMarketBalance();
         String orderId = placeOrder(ORDER_PRICE, ORDER_QUANTITY);
@@ -153,7 +161,7 @@ public class BalanceServiceTest extends BaseApiTest {
     }
 
     @Test(description = "Discover exact delta for price=30 qty=100; assert positive and reasonable")
-    public void balance_decreaseIsConsistentWithOrderSize() {
+    public void placeOrder_balanceDecreasesCorrectly() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         long balanceBefore = getMarketBalance();
         String orderId = placeOrder("30", "100");
@@ -171,7 +179,7 @@ public class BalanceServiceTest extends BaseApiTest {
     }
 
     @Test(description = "Place order with balance check before and after; balance should reflect open order")
-    public void placeOrder_balanceBeforeAndAfterReflectsOrder() {
+    public void placeOrder_balanceReflectsOpenOrder() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         if (Config.getTokenId() == null || Config.getTokenId().isBlank()) throw new SkipException("TOKEN_ID not set");
         if (eoa == null || eoa.isBlank() || proxyWallet == null || proxyWallet.isBlank()) throw new SkipException("EOA or proxy not set");
@@ -206,7 +214,7 @@ public class BalanceServiceTest extends BaseApiTest {
     }
 
     @Test(description = "Balance: overall usdc_balance >= by-market usdc_balance; when total/available/reserved present, available = total - reserved")
-    public void balance_availableEqualsTotalMinusReserved_whenFieldsPresent() {
+    public void balance_availableEqualsTotalMinusReserved() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
 
         Response overallRes = portfolioService.getBalance(token, cookie);

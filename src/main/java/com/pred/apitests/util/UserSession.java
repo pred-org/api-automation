@@ -33,4 +33,10 @@ public final class UserSession {
     public boolean hasToken() {
         return accessToken != null && !accessToken.isBlank();
     }
+
+    /** Cookie header value for requests: "refresh_token=<value>". */
+    public String getRefreshCookieHeaderValue() {
+        if (refreshCookie == null || refreshCookie.isBlank()) return "";
+        return refreshCookie.startsWith("refresh_token=") ? refreshCookie : "refresh_token=" + refreshCookie;
+    }
 }

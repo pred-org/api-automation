@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "activity": { "type": "string" },
+          "market_id": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "trade_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "activity": { "type": "string" },
+          "market_id": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,7 +1,7 @@
 package com.pred.apitests.util;
 
 /**
- * Single-user token holder. Stores access token (and optionally user id, proxy) after login.
+ * Single-user token holder. Use getSession() to get a UserSession for tests that support both user 1 and user 2. Stores access token (and optionally user id, proxy) after login.
  * Call setToken/setUser after login; getToken() for Bearer in later requests.
  * Refresh is cookie-based: capture Set-Cookie: refresh_token after login; send Cookie on every request; when token is near expiry (~40 min), re-call login with refresh cookie.
  */
@@ -128,6 +128,13 @@ public final class TokenManager {
 
     public boolean hasToken() {
         return accessToken != null && !accessToken.isBlank();
+    }
+
+    /** Build a UserSession from current TokenManager state (for use in tests that support both user 1 and user 2). */
+    public UserSession getSession() {
+        if (accessToken == null || accessToken.isBlank()) return null;
+        String cookie = refreshToken != null && !refreshToken.isBlank() ? "refresh_token=" + refreshToken : "";
+        return new UserSession(accessToken, cookie, userId, proxyWalletAddress, eoa, privateKey);
     }
 }
 

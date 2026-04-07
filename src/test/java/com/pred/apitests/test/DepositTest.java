@@ -5,7 +5,7 @@ import com.pred.apitests.config.Config;
 import com.pred.apitests.model.response.BalanceResponse;
 import com.pred.apitests.service.DepositService;
 import com.pred.apitests.service.PortfolioService;
-import com.pred.apitests.util.TokenManager;
+import com.pred.apitests.util.UserSession;
 import io.restassured.response.Response;
 import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
@@ -19,10 +19,16 @@ public class DepositTest extends BaseApiTest {
     private DepositService depositService;
     private PortfolioService portfolioService;
 
+    /** Current user (User 1 from TokenManager by default). Override in DepositTestUser2 to use SecondUserContext. */
+    protected UserSession getSession() {
+        return com.pred.apitests.util.TokenManager.getInstance().getSession();
+    }
+
     @BeforeClass
     public void init() {
-        if (!TokenManager.getInstance().hasToken()) {
-            throw new SkipException("No token - run AuthFlowTest first");
+        UserSession session = getSession();
+        if (session == null || !session.hasToken()) {
+            throw new SkipException("No session - run AuthFlowTest first (and AuthFlowTestUser2 for user 2)");
         }
         depositService = new DepositService();
         portfolioService = new PortfolioService();
@@ -30,28 +36,31 @@ public class DepositTest extends BaseApiTest {
 
     @Test(description = "Deposit: internal deposit then cashflow/deposit with transaction_hash (skipped if balance already sufficient)")
     public void depositFunds() {
-        String userId = TokenManager.getInstance().getUserId();
-        String accessToken = TokenManager.getInstance().getAccessToken();
-        String proxyAddress = TokenManager.getInstance().getProxyWalletAddress();
+        UserSession session = getSession();
+        String userId = session.getUserId();
+        String accessToken = session.getAccessToken();
+        String proxyAddress = session.getProxy();
         if (userId == null || userId.isBlank()) {
-            throw new SkipException("No userId in TokenManager");
+            throw new SkipException("No userId in session");
         }
         if (accessToken == null || proxyAddress == null || proxyAddress.isBlank()) {
-            throw new SkipException("No accessToken or proxy in TokenManager");
+            throw new SkipException("No accessToken or proxy in session");
         }
         long amount = Config.getDepositAmount();
 
-        Response balanceResponse = portfolioService.getBalance(accessToken, TokenManager.getInstance().getRefreshCookieHeaderValue());
+        String cookie = session.getRefreshCookieHeaderValue();
+        if (cookie == null || cookie.isBlank()) cookie = session.getRefreshCookie();
+        Response balanceResponse = portfolioService.getBalance(accessToken, cookie);
         if (balanceResponse.getStatusCode() == 200) {
             BalanceResponse balance = balanceResponse.as(BalanceResponse.class);
             String usdcStr = balance != null ? balance.getUsdcBalance() : null;
             if (usdcStr != null && !usdcStr.isBlank()) {
                 try {
-                    long currentBalance = Long.parseLong(usdcStr.trim());
+                    long currentBalance = parseBalanceAsLong(usdcStr);
                     if (currentBalance >= amount) {
                         throw new SkipException("Balance already sufficient (" + usdcStr + "), deposit skipped (once per user)");
                     }
-                } catch (NumberFormatException ignored) { }
+                } catch (IllegalArgumentException ignored) { }
             }
         }
 

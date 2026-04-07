@@ -47,8 +47,10 @@ public final class Config {
                 else if (key.equals("PRIVATE_KEY_2")) sysKey = "second.user.private.key";
                 else if (key.equals("EOA_ADDRESS_2")) sysKey = "second.user.eoa";
                 else if (key.equals("MARKET_ID")) sysKey = "market.id";
+                else if (key.equals("CANONICAL_NAME")) sysKey = "canonical.name";
                 else if (key.equals("SIG_SERVER_URL")) sysKey = "sig.server.url";
                 else if (key.equals("API_KEY")) sysKey = "api.key";
+                else if (key.equals("API_KEY_2")) sysKey = "second.user.api.key";
                 if (System.getProperty(sysKey) == null || System.getProperty(sysKey).isBlank())
                     System.setProperty(sysKey, value);
             }
@@ -112,6 +114,15 @@ public final class Config {
         );
     }
 
+    /** API key for user 2 login (when backend allows only one user per key). Env API_KEY_2 or property second.user.api.key. */
+    public static String getSecondUserApiKey() {
+        return firstNonBlank(
+                System.getProperty("second.user.api.key"),
+                System.getenv("API_KEY_2"),
+                PROPS.getProperty("second.user.api.key")
+        );
+    }
+
     public static String getSigServerUrl() {
         return trimSlash(firstNonBlank(
                 System.getProperty("sig.server.url"),
@@ -162,6 +173,15 @@ public final class Config {
                 System.getProperty("market.id"),
                 System.getenv("MARKET_ID"),
                 PROPS.getProperty("market.id")
+        );
+    }
+
+    /** Fixture canonical name for market discovery (e.g. westham-vs-wolves-2026). Optional if MARKET_ID is set. */
+    public static String getCanonicalName() {
+        return firstNonBlank(
+                System.getProperty("canonical.name"),
+                System.getenv("CANONICAL_NAME"),
+                PROPS.getProperty("canonical.name")
         );
     }
 

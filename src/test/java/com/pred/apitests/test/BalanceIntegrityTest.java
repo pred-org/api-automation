@@ -8,6 +8,8 @@ import com.pred.apitests.model.response.SignOrderResponse;
 import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.PortfolioService;
 import com.pred.apitests.service.SignatureService;
+import com.pred.apitests.util.MarketContext;
+import com.pred.apitests.util.PollingUtil;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.testng.SkipException;
@@ -18,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Exact financial correctness: delta assertions and insufficient balance.
- * TODO: after first run of BalanceServiceTest.balance_decreaseIsConsistentWithOrderSize, replace 0L with printed delta.
+ * TODO: after first run of BalanceServiceTest.placeOrder_balanceDecreasesCorrectly, replace 0L with printed delta.
  */
 public class BalanceIntegrityTest extends BaseApiTest {
 
@@ -27,12 +29,13 @@ public class BalanceIntegrityTest extends BaseApiTest {
     private OrderService orderService;
     private PortfolioService portfolioService;
     private SignatureService signatureService;
-    private String token;
-    private String cookie;
     private String eoa;
     private String proxyWallet;
     private String userId;
+    /** Sub-market id (question) for sign, place body, balance-by-market. */
     private String marketId;
+    /** Parent market id for /order/{parent}/place and cancel paths. */
+    private String parentMarketId;
 
     @BeforeClass
     public void init() {
@@ -42,17 +45,21 @@ public class BalanceIntegrityTest extends BaseApiTest {
         orderService = new OrderService();
         portfolioService = new PortfolioService();
         signatureService = new SignatureService();
-        token = TokenManager.getInstance().getAccessToken();
-        cookie = TokenManager.getInstance().getRefreshCookieHeaderValue();
         eoa = TokenManager.getInstance().getEoa();
         if (eoa == null || eoa.isBlank()) eoa = Config.getEoaAddress();
         proxyWallet = TokenManager.getInstance().getProxyWalletAddress();
         userId = TokenManager.getInstance().getUserId();
-        marketId = Config.getMarketId();
+        try {
+            MarketContext.getInstance().init();
+        } catch (Exception e) {
+            System.out.println("MarketContext init skipped: " + e.getMessage());
+        }
+        marketId = MarketContext.resolveMarketId();
+        parentMarketId = MarketContext.resolveParentMarketIdForPath();
     }
 
     private long getOverallBalance() {
-        Response response = portfolioService.getBalance(token, cookie);
+        Response response = portfolioService.getBalance(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue());
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
         if (usdc == null || usdc.isBlank()) return 0L;
@@ -61,7 +68,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
 
     private long getMarketBalance() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
-        Response response = portfolioService.getBalanceByMarket(token, cookie, marketId);
+        Response response = portfolioService.getBalanceByMarket(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue(), marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
         String usdc = response.path("usdc_balance");
         if (usdc == null || usdc.isBlank()) return 0L;
@@ -118,7 +125,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
                 .reduceOnly(false)
                 .feeRateBps(0)
                 .build();
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue(), eoa, proxyWallet, parentMarketId, orderBody);
         assertThat(response.getStatusCode()).isEqualTo(202);
         String orderId = response.jsonPath().getString("order_id");
         return orderId != null ? orderId.trim() : "";
@@ -173,7 +180,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
                 .reduceOnly(false)
                 .feeRateBps(0)
                 .build();
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue(), eoa, proxyWallet, parentMarketId, orderBody);
         assertThat(response.getStatusCode()).isEqualTo(202);
         String orderId = response.jsonPath().getString("order_id");
         return orderId != null ? orderId.trim() : "";
@@ -181,12 +188,12 @@ public class BalanceIntegrityTest extends BaseApiTest {
 
     private void cancelOrder(String orderId) {
         if (orderId == null || orderId.isBlank()) return;
-        Response r = orderService.cancelOrder(token, cookie, marketId, orderId);
+        Response r = orderService.cancelOrder(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue(), parentMarketId, orderId);
         assertThat(r.getStatusCode()).as("cancel order").isBetween(200, 299);
     }
 
     @Test(description = "Exact delta after placing order (price=30 qty=100); first run asserts direction only")
-    public void balance_exactDeltaAfterPlacingOrder() {
+    public void placeOrder_balanceDecreasesExactly() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         long before = getMarketBalance();
         String orderId = placeOrder("30", "100");
@@ -200,26 +207,24 @@ public class BalanceIntegrityTest extends BaseApiTest {
     }
 
     @Test(description = "Balance exactly restores after cancel with 2s wait")
-    public void balance_exactRestoreAfterCancel() {
+    public void cancelOrder_balanceRestoresExactly() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         long before = getMarketBalance();
         String orderId = placeOrder("30", "100");
         long afterPlace = getMarketBalance();
         assertThat(afterPlace).isLessThan(before);
         cancelOrder(orderId);
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
+        long expectedBalance = before;
+        PollingUtil.pollUntil(6_000, 300, 500,
+                "Balance did not restore after cancel within 6s",
+                () -> getMarketBalance() == expectedBalance);
         long afterCancel = getMarketBalance();
         System.out.println("[RESTORE CHECK] before=" + before + " afterCancel=" + afterCancel);
         assertThat(afterCancel).isEqualTo(before);
     }
 
     @Test(description = "Two orders of same size: deltas equal")
-    public void balance_twoOrdersDeltaIsTwiceSingleDelta() {
+    public void twoOrders_balanceDeductionIsConsistent() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         long before = getMarketBalance();
         String order1 = placeOrder("30", "100");
@@ -259,7 +264,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
         assertThat(largeDelta).isGreaterThan(smallDelta);
     }
 
-    @Test(description = "Oversized order rejected with 4xx or accepted then cancelled")
+    @Test(enabled = false, description = "DISABLED - was placing 999999999 qty orders that pollute the orderbook. Re-enable only in isolated env with controlled balance.")
     public void placeOrder_insufficientBalance_returns4xx() {
         if (marketId == null || marketId.isBlank() || Config.getTokenId() == null || Config.getTokenId().isBlank())
             throw new SkipException("MARKET_ID or TOKEN_ID not set");
@@ -317,7 +322,7 @@ public class BalanceIntegrityTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(TokenManager.getInstance().getAccessToken(), TokenManager.getInstance().getRefreshCookieHeaderValue(), eoa, proxyWallet, parentMarketId, orderBody);
         System.out.println("[INSUFFICIENT] status=" + response.getStatusCode());
         System.out.println("[INSUFFICIENT] body=" + response.getBody().asString());
 

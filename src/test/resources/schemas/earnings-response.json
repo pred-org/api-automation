@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [ "user_id", "realized_pnl", "unrealized_pnl", "total_pnl" ],
+  "properties": {
+    "user_id": { "type": "string" },
+    "realized_pnl": { "oneOf": [ { "type": "string" }, { "type": "number" } ] },
+    "unrealized_pnl": { "oneOf": [ { "type": "string" }, { "type": "number" } ] },
+    "total_pnl": { "oneOf": [ { "type": "string" }, { "type": "number" } ] }
+  },
+  "additionalProperties": true
+}

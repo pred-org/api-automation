@@ -42,5 +42,16 @@ market-smoke-server/node_modules/
 .DS_Store
 Thumbs.db
 
+# Session docs (private)
 docs/
 documents/
+
+# Cursor IDE rules
+.cursor/
+
+# Test output
+test-output.txt
+
+# Scratch / demo files (local reference)
+2
+without-framwork.java

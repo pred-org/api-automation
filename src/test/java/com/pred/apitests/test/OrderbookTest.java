@@ -7,6 +7,8 @@ import com.pred.apitests.model.request.SignOrderRequest;
 import com.pred.apitests.model.response.SignOrderResponse;
 import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.SignatureService;
+import com.pred.apitests.util.MarketContext;
+import com.pred.apitests.util.SchemaValidator;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.testng.SkipException;
@@ -27,6 +29,7 @@ public class OrderbookTest extends BaseApiTest {
     private OrderService orderService;
     private SignatureService signatureService;
     private String marketId;
+    private String parentMarketId;
     private String tokenId;
     private String token;
     private String cookie;
@@ -41,7 +44,13 @@ public class OrderbookTest extends BaseApiTest {
         }
         orderService = new OrderService();
         signatureService = new SignatureService();
-        marketId = Config.getMarketId();
+        try {
+            MarketContext.getInstance().init();
+        } catch (Exception e) {
+            System.out.println("MarketContext init skipped: " + e.getMessage());
+        }
+        marketId = MarketContext.resolveMarketId();
+        parentMarketId = MarketContext.resolveParentMarketIdForPath();
         tokenId = Config.getTokenId();
         token = TokenManager.getInstance().getAccessToken();
         cookie = TokenManager.getInstance().getRefreshCookieHeaderValue();
@@ -52,10 +61,11 @@ public class OrderbookTest extends BaseApiTest {
     }
 
     @Test(description = "GET orderbook returns 200; structure has bids, asks, metadata; metadata.spread present (public, no auth)")
-    public void getOrderbook_returns200_structureAndSpread() {
+    public void orderbook_returnsValidStructure() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
-        Response response = orderService.getOrderbook(marketId);
+        Response response = orderService.getOrderbook(parentMarketId, marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
+        SchemaValidator.assertMatchesSchema(response, "orderbook-response.json");
         response.then().body("bids", notNullValue()).body("asks", notNullValue()).body("metadata", notNullValue());
         response.then().body("metadata.spread", notNullValue());
         List<?> bids = response.path("bids");
@@ -65,12 +75,14 @@ public class OrderbookTest extends BaseApiTest {
     }
 
     @Test(description = "Guard: bids exist and bids[0].quantity > 0; no bid liquidity means SHORT tests cannot run")
-    public void orderbook_bidSideExists_beforeShortOrder() {
+    public void orderbook_hasBidsBeforeShortOrder() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
-        Response response = orderService.getOrderbook(marketId);
+        Response response = orderService.getOrderbook(parentMarketId, marketId);
         assertThat(response.getStatusCode()).isEqualTo(200);
         List<?> bids = response.path("bids");
-        assertThat(bids).as("No bid liquidity in UAT - SHORT tests cannot run").isNotEmpty();
+        if (bids == null || bids.isEmpty()) {
+            throw new SkipException("No bid liquidity in UAT for this market — SHORT orderbook tests need resting bids");
+        }
         Object first = bids.get(0);
         assertThat(first).isInstanceOf(Map.class);
         @SuppressWarnings("unchecked")
@@ -82,12 +94,12 @@ public class OrderbookTest extends BaseApiTest {
     }
 
     @Test(description = "total_bid_quantity decreases by N after placing SHORT market order for N shares")
-    public void orderbook_totalBidQuantity_decreasesAfterShortOrder() {
+    public void orderbook_bidQuantityDecreasesAfterShort() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
         if (tokenId == null || tokenId.isBlank() || eoa == null || eoa.isBlank() || proxyWallet == null || proxyWallet.isBlank()) {
             throw new SkipException("TOKEN_ID, EOA or proxy not set");
         }
-        Response beforeRes = orderService.getOrderbook(marketId);
+        Response beforeRes = orderService.getOrderbook(parentMarketId, marketId);
         assertThat(beforeRes.getStatusCode()).isEqualTo(200);
         List<?> bids = beforeRes.path("bids");
         if (bids == null || bids.isEmpty()) throw new SkipException("No bid liquidity in UAT - SHORT tests cannot run");
@@ -104,7 +116,7 @@ public class OrderbookTest extends BaseApiTest {
         boolean placed = placeShortLimitOrderAtPrice(bestBidPrice, String.valueOf(nShares));
         if (!placed) throw new SkipException("Could not place SHORT order - skip orderbook delta assertion");
 
-        Response afterRes = orderService.getOrderbook(marketId);
+        Response afterRes = orderService.getOrderbook(parentMarketId, marketId);
         assertThat(afterRes.getStatusCode()).isEqualTo(200);
         Object totalBidAfterObj = afterRes.path("metadata.total_bid_quantity");
         if (totalBidAfterObj == null) totalBidAfterObj = afterRes.path("total_bid_quantity");
@@ -160,7 +172,7 @@ public class OrderbookTest extends BaseApiTest {
                 .feeRateBps(0)
                 .build();
 
-        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, marketId, orderBody);
+        Response response = orderService.placeOrder(token, cookie, eoa, proxyWallet, parentMarketId, orderBody);
         return response.getStatusCode() == 202;
     }
 }

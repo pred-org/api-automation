@@ -13,6 +13,7 @@ const domain = {
   name: "Pred Contract Proxy Factory",
   chainId: 84532,
   verifyingContract: "0xBdb12f3B7C73590120164d0AEd7CcE31A3084040",
+
 };
 
 const types = {
