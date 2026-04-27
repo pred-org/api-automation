@@ -1,7 +1,7 @@
 # Optional / legacy: project uses .env at repo root as single config source.
 # Java loads .env via Config; sig-server loads it on startup. You do not need this file.
 # If you prefer exporting in shell instead of .env, copy to set_env.sh, fill values, then:
-#   source scripts/set_env.sh
+#   source tools/scripts/set_env.sh
 # before mvn test or npm start. Do not commit set_env.sh (in .gitignore).
 
 export PRIVATE_KEY=          # Your EOA private key (hex, no 0x prefix)

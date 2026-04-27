@@ -15,7 +15,7 @@ Runs only **place order** and **cancel order** in a loop to find API rate limits
 ```bash
 mvn test -Dtest=AuthFlowTest
 source .env.session
-K6_QUICK=1 k6 run k6/place-cancel-rate-limit.js
+K6_QUICK=1 k6 run tools/k6/place-cancel-rate-limit.js
 ```
 
 **Option B:** Copy from test output and export manually: run `mvn test -Dtest=AuthFlowTest`, then from logs get access token (ACCESS_TOKEN_FOR_POSTMAN), refresh cookie (Cookie: refresh_token=...), EOA, proxy, user_id, and export them before running k6.
@@ -27,23 +27,23 @@ Optional env (defaults are UAT): `BASE_URL`, `SIG_SERVER_URL`, `MARKET_ID`, `TOK
 Default run (5 min ramp: 2 to 30 VUs for rate-limit probing):
 
 ```bash
-k6 run k6/place-cancel-rate-limit.js
+k6 run tools/k6/place-cancel-rate-limit.js
 ```
 
 1-minute smoke test (20 VUs by default, to confirm orders on the frontend):
 
 ```bash
 source .env.session
-K6_QUICK=1 k6 run k6/place-cancel-rate-limit.js
+K6_QUICK=1 k6 run tools/k6/place-cancel-rate-limit.js
 ```
 
 Higher load (target >20 RPS for place/cancel): use more VUs and/or less sleep between cycles:
 
 ```bash
 source .env.session
-K6_QUICK=1 K6_VUS=50 k6 run k6/place-cancel-rate-limit.js
+K6_QUICK=1 K6_VUS=50 k6 run tools/k6/place-cancel-rate-limit.js
 # or with shorter pause:
-K6_QUICK=1 K6_VUS=50 K6_ITER_SLEEP=0.1 k6 run k6/place-cancel-rate-limit.js
+K6_QUICK=1 K6_VUS=50 K6_ITER_SLEEP=0.1 k6 run tools/k6/place-cancel-rate-limit.js
 ```
 
 - `K6_VUS`: VUs for the quick run (default 20).
@@ -70,7 +70,7 @@ To **fetch consumer lag from Kadek UAT** and include it in the report, the scrip
 export KADEK_LAG_URL="https://kafka-uat.yourcompany.com/kafka/v3/clusters/<cluster_id>/consumer-groups/<consumer_group_id>/lags"
 export KADEK_LAG_AUTH_HEADER="Bearer <your-token>"
 source .env.session
-K6_QUICK=1 K6_VUS=50 k6 run k6/place-cancel-rate-limit.js
+K6_QUICK=1 K6_VUS=50 k6 run tools/k6/place-cancel-rate-limit.js
 ```
 
 **Expected response shape:** the script parses JSON and supports:

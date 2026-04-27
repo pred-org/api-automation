@@ -9,27 +9,27 @@
  *
  * Run (after auth, recommended):
  *   source .env.session
- *   k6 run k6/place-cancel-rate-limit.js
+ *   k6 run tools/k6/place-cancel-rate-limit.js
  *
  * Or set env manually:  export ACCESS_TOKEN="..."; export REFRESH_COOKIE="..."; export EOA="0x..."; export PROXY="0x..."; export USER_ID="<uuid>"
  *
- * 1-minute smoke test:  source .env.session && K6_QUICK=1 k6 run k6/place-cancel-rate-limit.js
- * Higher load (>20 RPS):  source .env.session && K6_QUICK=1 K6_VUS=50 k6 run k6/place-cancel-rate-limit.js
+ * 1-minute smoke test:  source .env.session && K6_QUICK=1 k6 run tools/k6/place-cancel-rate-limit.js
+ * Higher load (>20 RPS):  source .env.session && K6_QUICK=1 K6_VUS=50 k6 run tools/k6/place-cancel-rate-limit.js
  * Optional:  K6_ITER_SLEEP=0.1  (default 0.2) for less pause between place+cancel cycles.
- * Smoke (quick sanity check):  K6_MODE=smoke K6_VUS=10 k6 run k6/place-cancel-rate-limit.js
- * Load  (ramp up, find limit):  K6_MODE=load k6 run k6/place-cancel-rate-limit.js
- * Spike (burst, match kick-off): K6_MODE=spike k6 run k6/place-cancel-rate-limit.js
+ * Smoke (quick sanity check):  K6_MODE=smoke K6_VUS=10 k6 run tools/k6/place-cancel-rate-limit.js
+ * Load  (ramp up, find limit):  K6_MODE=load k6 run tools/k6/place-cancel-rate-limit.js
+ * Spike (burst, match kick-off): K6_MODE=spike k6 run tools/k6/place-cancel-rate-limit.js
  * Place then cancel burst (place 10s to build ~200 order IDs, then cancel all at 30 RPS):
- *   K6_MODE=cancel_burst k6 run k6/place-cancel-rate-limit.js
+ *   K6_MODE=cancel_burst k6 run tools/k6/place-cancel-rate-limit.js
  *   Env: K6_PLACE_PHASE_SEC=10, K6_CANCEL_BURST_RPS=30, K6_CANCEL_BURST_VUS=30
- * Place only for 1 min (no cancel):  K6_MODE=place_only k6 run k6/place-cancel-rate-limit.js
- * Cancel only for 1 min (setup places to build order IDs, then 1 min cancel at target RPS):  K6_MODE=cancel_only k6 run k6/place-cancel-rate-limit.js
- * Max cancel RPS:  K6_MODE=cancel_only K6_CANCEL_BURST_VUS=50 K6_CANCEL_BURST_RPS=50 K6_CANCEL_ONLY_PLACE_SEC=120 k6 run k6/place-cancel-rate-limit.js
+ * Place only for 1 min (no cancel):  K6_MODE=place_only k6 run tools/k6/place-cancel-rate-limit.js
+ * Cancel only for 1 min (setup places to build order IDs, then 1 min cancel at target RPS):  K6_MODE=cancel_only k6 run tools/k6/place-cancel-rate-limit.js
+ * Max cancel RPS:  K6_MODE=cancel_only K6_CANCEL_BURST_VUS=50 K6_CANCEL_BURST_RPS=50 K6_CANCEL_ONLY_PLACE_SEC=120 k6 run tools/k6/place-cancel-rate-limit.js
  * Try 25 RPS (even pacing, may get more success than 30/s burst):  K6_CANCEL_BURST_RPS=25 K6_CANCEL_BURST_VUS=25 K6_MODE=cancel_only k6 run ...
  *   (ensure order IDs >= RPS * 60: increase K6_CANCEL_ONLY_PLACE_SEC if cancels run out)
  * If cancel_only hits ~400 cancels (k6 setup payload limit): use a file. Create a JSON array of order IDs, then:
- *   node scripts/place-only-to-file.js   (prints the exact K6_ORDER_IDS_FILE=... command to run)
- *   K6_ORDER_IDS_FILE=<absolute-path> K6_MODE=cancel_only k6 run k6/place-cancel-rate-limit.js
+ *   node tools/scripts/place-only-to-file.js   (prints the exact K6_ORDER_IDS_FILE=... command to run)
+ *   K6_ORDER_IDS_FILE=<absolute-path> K6_MODE=cancel_only k6 run tools/k6/place-cancel-rate-limit.js
  *   (k6 resolves K6_ORDER_IDS_FILE relative to the script dir; use the absolute path printed by place-only-to-file.js.)
  * Two users (place both sides to get matches -> positions): set USER_2_ACCESS_TOKEN, USER_2_EOA, USER_2_PROXY, USER_2_USER_ID (optional USER_2_REFRESH_COOKIE). User 1 = long, User 2 = short by default (K6_USER_1_SIDE, K6_USER_2_SIDE to override).
  * Include consumer lag / kadek in report:  K6_CONSUMER_LAG="..."  or  K6_REPORT_EXTRA="..."
@@ -100,15 +100,15 @@ if (__ENV.K6_MODE === "cancel_only" && __ENV.K6_ORDER_IDS_FILE) {
 const stages = {
 
   // Smoke: quick sanity check after a deploy. Short run, low VUs.
-  // Run: K6_MODE=smoke K6_VUS=10 k6 run k6/place-cancel-rate-limit.js
-  // Or:  K6_QUICK=1 K6_VUS=10 k6 run k6/place-cancel-rate-limit.js
+  // Run: K6_MODE=smoke K6_VUS=10 k6 run tools/k6/place-cancel-rate-limit.js
+  // Or:  K6_QUICK=1 K6_VUS=10 k6 run tools/k6/place-cancel-rate-limit.js
   smoke: [
     { duration: "10s", target: vus },
     { duration: "50s", target: vus },
   ],
 
   // Load: gradually ramp up to find the exact point where 429s start.
-  // Run: K6_MODE=load k6 run k6/place-cancel-rate-limit.js
+  // Run: K6_MODE=load k6 run tools/k6/place-cancel-rate-limit.js
   load: [
     { duration: "30s", target: 5 },
     { duration: "30s", target: 10 },
@@ -119,7 +119,7 @@ const stages = {
   ],
 
   // Spike: sudden burst to simulate match kick-off (many users at once).
-  // Run: K6_MODE=spike k6 run k6/place-cancel-rate-limit.js
+  // Run: K6_MODE=spike k6 run tools/k6/place-cancel-rate-limit.js
   spike: [
     { duration: "10s", target: 5 },
     { duration: "10s", target: 100 },
@@ -129,14 +129,14 @@ const stages = {
   ],
 
   // Place for N seconds to build order IDs, then cancel all at target RPS (e.g. 30/s).
-  // Run: K6_MODE=cancel_burst k6 run k6/place-cancel-rate-limit.js
+  // Run: K6_MODE=cancel_burst k6 run tools/k6/place-cancel-rate-limit.js
   // Env: K6_PLACE_PHASE_SEC=10, K6_CANCEL_BURST_RPS=30, K6_CANCEL_BURST_VUS=30
   cancel_burst: [
     { duration: "10s", target: cancelBurstVUs },
   ],
 
   // Place order only for 1 min, no cancel.
-  // Run: K6_MODE=place_only k6 run k6/place-cancel-rate-limit.js
+  // Run: K6_MODE=place_only k6 run tools/k6/place-cancel-rate-limit.js
   place_only: [
     { duration: "60s", target: vus },
   ],
@@ -676,7 +676,7 @@ export function handleSummary(data) {
     if (cancelAttempts > 0) {
       lines.push("  Cancel active window: " + fmt(cancelActiveDurationSec) + " s (" + fmt(cancelAttempts) + " attempts at " + targetCancelRps + " target RPS; success RPS above is over this window)");
       if (cancelAttempts < targetCancelRps * (reportMode === "cancel_only" ? 55 : 8)) {
-        lines.push("  Tip: to sustain target RPS for 60s use 1800+ order IDs: node scripts/place-only-to-file.js then K6_ORDER_IDS_FILE=<path>");
+        lines.push("  Tip: to sustain target RPS for 60s use 1800+ order IDs: node tools/scripts/place-only-to-file.js then K6_ORDER_IDS_FILE=<path>");
       }
     }
   }
@@ -728,7 +728,7 @@ export function handleSummary(data) {
     "k6 Place/Cancel rate-limit test - report for service owner",
     "==========================================================",
     runConfigLine,
-    "Script: k6/place-cancel-rate-limit.js (place order then cancel order per iteration)",
+    "Script: tools/k6/place-cancel-rate-limit.js (place order then cancel order per iteration)",
     "",
     summaryText.trim(),
     "",

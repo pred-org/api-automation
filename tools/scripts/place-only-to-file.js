@@ -7,11 +7,11 @@
  *
  * Usage:
  *   source .env.session
- *   node scripts/place-only-to-file.js
- *   # Optional: PLACE_SEC=120 OUT_FILE=./order-ids.json node scripts/place-only-to-file.js
+ *   node tools/scripts/place-only-to-file.js
+ *   # Optional: PLACE_SEC=120 OUT_FILE=./order-ids.json node tools/scripts/place-only-to-file.js
  *
  * Then run cancel_only with the file (use the absolute path printed below; k6 resolves paths relative to the script):
- *   K6_ORDER_IDS_FILE=<absolute-path> K6_MODE=cancel_only k6 run k6/place-cancel-rate-limit.js
+ *   K6_ORDER_IDS_FILE=<absolute-path> K6_MODE=cancel_only k6 run tools/k6/place-cancel-rate-limit.js
  */
 
 const fs = require("fs");
@@ -31,7 +31,9 @@ const proxy = process.env.PROXY;
 const userId = process.env.USER_ID;
 
 const placeSec = Math.max(1, parseInt(process.env.PLACE_SEC || "120", 10));
-const outFile = path.resolve(process.cwd(), process.env.OUT_FILE || "order-ids.json");
+const outFile = process.env.OUT_FILE
+  ? path.resolve(process.cwd(), process.env.OUT_FILE)
+  : path.join(__dirname, "output", "order-ids.json");
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -148,10 +150,11 @@ async function main() {
     await sleep(50);
   }
 
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, JSON.stringify(orderIds));
   console.log("Wrote " + orderIds.length + " order IDs to " + outFile);
   if (orderIds.length > 0) {
-    console.log("Run cancel_only with: K6_ORDER_IDS_FILE=" + outFile + " K6_MODE=cancel_only k6 run k6/place-cancel-rate-limit.js");
+    console.log("Run cancel_only with: K6_ORDER_IDS_FILE=" + outFile + " K6_MODE=cancel_only k6 run tools/k6/place-cancel-rate-limit.js");
   }
 }
 

@@ -11,7 +11,7 @@ This service exposes a single HTTP endpoint that authenticates two wallets, disc
 ## Setup
 
 ```bash
-cd market-smoke-server
+cd tools/ops/market-smoke-server
 cp .env.example .env
 # Edit .env if you use non-default PRED or sig-server URLs
 npm install

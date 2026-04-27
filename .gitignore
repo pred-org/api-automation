@@ -23,7 +23,7 @@ logs/
 .env.session
 .env.session2
 .env.*.local
-scripts/set_env.sh
+tools/scripts/set_env.sh
 
 # Allure
 allure-results/
@@ -33,7 +33,7 @@ allure-report/
 sig-server/node_modules/
 sig-server/config.js
 
-market-smoke-server/node_modules/
+tools/ops/market-smoke-server/node_modules/
 
 # Local backup bundles (do not commit)
 *.bundle
@@ -42,8 +42,7 @@ market-smoke-server/node_modules/
 .DS_Store
 Thumbs.db
 
-# Session docs (private)
-docs/
+# Local workspace (private notes, exports); durable docs live in docs/
 documents/
 
 # Cursor IDE rules
@@ -51,6 +50,18 @@ documents/
 
 # Test output
 test-output.txt
+k6-place-cancel-summary.json
+k6-failure-report.txt
+coverage-report.html
+
+# Generated script / k6 output (repo root or tools)
+order-ids.json
+api-automation-backup-*.bundle
+tools/scripts/output/
+
+# Leftover paths if old root dirs reappear (do not match tools/k6 or tools/scripts)
+/k6/
+/scripts/
 
 # Scratch / demo files (local reference)
 2

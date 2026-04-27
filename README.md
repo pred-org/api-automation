@@ -10,6 +10,15 @@ The suite covers auth, enable trading, deposits, portfolio, orders, orderbook, m
 - **Java 17+**
 - **Maven 3.6+**
 
+## Repository structure
+
+- `docs/` — Technical documentation ([docs/DOCS-INDEX.md](docs/DOCS-INDEX.md))
+- `src/` — API test suite (RestAssured + TestNG)
+- `sig-server/` — Signing server (starts automatically during `mvn test` or via `start-sig-server.sh`)
+- `tools/k6/` — k6 load and stress test scripts
+- `tools/scripts/` — Utility scripts (for example order ID capture for k6)
+- `tools/ops/` — Ops tools (market verification server and verify-market shell helpers)
+
 ## Project layout
 
 ```
@@ -38,26 +47,7 @@ cd api-automation
 mvn test
 ```
 
-Tests are driven by the TestNG suite `src/test/resources/suite.xml`. Use a different suite:
-
-```bash
-mvn test -Dsuite=src/test/resources/other-suite.xml
-```
-
-**Allure report:** After `mvn test`, generate and open the report:
-
-```bash
-mvn allure:serve
-```
-
-Override base URI:
-
-```bash
-mvn test -Dapi.base.uri=https://your-api-host.com
-# or
-export API_BASE_URI=https://your-api-host.com
-mvn test
-```
+Default suite: `src/test/resources/suite.xml`. **Full command reference** (alternate suites, auth, two-user flow, Allure, `tools/`): [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## CI/CD (GitHub Actions)
 
@@ -69,12 +59,13 @@ Workflow [.github/workflows/api-tests.yml](.github/workflows/api-tests.yml) runs
 
 ## Framework and design
 
-- **Objectives and alignment:** [docs/OBJECTIVES_AND_ALIGNMENT.md](docs/OBJECTIVES_AND_ALIGNMENT.md). State transitions, two users, balances, success criteria.
-- **Framework (stack, structure, filters, CI):** [docs/FRAMEWORK.md](docs/FRAMEWORK.md). Includes **section 15** (enums, POJOs, utils, assertions, DB future).
-- **HTTP API reference (canonical):** [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md). Derived from Java service classes.
-- **Test cases and coverage:** [docs/TESTCASES-COVERED.md](docs/TESTCASES-COVERED.md).
-- **Commands (Maven, suite, env):** [docs/COMMANDS-AUTOMATION.md](docs/COMMANDS-AUTOMATION.md).
-- **Per-repo file map:** [docs/FILE-BY-FILE-INVENTORY.md](docs/FILE-BY-FILE-INVENTORY.md) (includes documentation index at the top).
+- **Documentation index:** [docs/DOCS-INDEX.md](docs/DOCS-INDEX.md)
+- **Objectives and alignment:** [docs/OBJECTIVES_AND_ALIGNMENT.md](docs/OBJECTIVES_AND_ALIGNMENT.md)
+- **Framework (stack, structure, filters, CI):** [docs/FRAMEWORK.md](docs/FRAMEWORK.md)
+- **HTTP API reference (canonical):** [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
+- **Test cases and coverage:** [docs/TESTCASES-COVERED.md](docs/TESTCASES-COVERED.md)
+- **Commands (Maven, TestNG, tooling):** [docs/COMMANDS.md](docs/COMMANDS.md)
+- **Per-repo file map:** [docs/FILE-BY-FILE-INVENTORY.md](docs/FILE-BY-FILE-INVENTORY.md)
 
 ## Next steps
 
