@@ -19,10 +19,10 @@ module.exports = {
   users: [
     {
       id: "user1",
-      PRIVATE_KEY: process.env.USER1_PRIVATE_KEY || "0x2d07b07b6d6e09d4e718cb7c29ed60f7a5c5ef2c92ae55fd3e34f9c4151186f5",
-      EOA_ADDRESS: process.env.USER1_EOA || "0x2D5a425b242eeA189DDa1740D92fA0D0Bb27b925",
+      PRIVATE_KEY: process.env.USER1_PRIVATE_KEY || "",
+      EOA_ADDRESS: process.env.USER1_EOA || "",
       PROXY: process.env.USER1_PROXY || null,
-      API_KEY: process.env.USER1_API_KEY || "931d2521-7d33-45e3-8cfb-322b7e7496ae-6c039587-0091-41ba-8ca0-53ad8ccee17f",
+      API_KEY: process.env.USER1_API_KEY || "",
       USER_ID: process.env.USER1_USER_ID || null,
       ACCESS_TOKEN: process.env.USER1_TOKEN || null,
       order: {

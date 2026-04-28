@@ -12,7 +12,7 @@ const wallet = new ethers.Wallet(config.PRIVATE_KEY);
 const derivedAddress = wallet.address;
 
 console.log("Config:");
-console.log("   PRIVATE_KEY: " + config.PRIVATE_KEY.substring(0, 10) + "..." + config.PRIVATE_KEY.slice(-6));
+console.log("   PRIVATE_KEY: " + (config.PRIVATE_KEY ? "(set)" : "(not set)"));
 console.log("   EOA (derived): " + derivedAddress);
 console.log("   EOA_ADDRESS: " + (config.EOA_ADDRESS || "(use derived)"));
 console.log("   API_KEY: " + (config.API_KEY ? config.API_KEY.substring(0, 20) + "..." : "(not set)"));

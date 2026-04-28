@@ -79,3 +79,7 @@ docs/FRAMEWORK.md
 docs/DOCS-INDEX.md
 docs/TESTCASES-COVERED.md
 docs/flow.md
+
+# sig-server sensitive data
+sig-server/users-tokens.json
+sig-server/.DS_Store
