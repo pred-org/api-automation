@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.config.Config;
 import com.pred.apitests.model.response.PrepareResponse;
+import com.pred.apitests.service.AuthService;
 import com.pred.apitests.service.EnableTradingService;
 import com.pred.apitests.service.SignatureService;
+import com.pred.apitests.util.SessionFileWriter;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.slf4j.Logger;
@@ -99,7 +101,22 @@ public class EnableTradingTest extends BaseApiTest {
         }
         assertThat(status).as("Enable trading execute (report 500/transaction failed to dev team)").isEqualTo(200);
 
-        LOG.info("Enable trading complete for proxy: {}", proxyWallet);
+        // Refresh token so the new JWT carries is_enabled_trading=true.
+        // Without this, the old JWT still has is_enabled_trading=false and order placement returns 400.
+        LOG.info("Enable trading complete for proxy: {} — refreshing token to pick up is_enabled_trading=true", proxyWallet);
+        AuthService authService = new AuthService();
+        String eoa = TokenManager.getInstance().getEoa();
+        String pk = TokenManager.getInstance().getPrivateKey();
+        boolean refreshed = authService.refreshUser1SessionAfter401();
+        if (refreshed) {
+            // Restore EOA and privateKey (refresh may overwrite them)
+            if (eoa != null && !eoa.isBlank()) TokenManager.getInstance().setEoa(eoa);
+            if (pk != null && !pk.isBlank()) TokenManager.getInstance().setPrivateKey(pk);
+            SessionFileWriter.writeFromTokenManager();
+            LOG.info("Token refreshed — is_enabled_trading should now be true in JWT");
+        } else {
+            LOG.warn("Token refresh after enable-trading failed — downstream order tests may get 400");
+        }
     }
 
     /** Try common paths for transactionHash (API may use data.transactionHash or data.data.transactionHash). */

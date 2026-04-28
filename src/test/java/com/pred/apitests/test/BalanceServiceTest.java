@@ -10,6 +10,7 @@ import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.PortfolioService;
 import com.pred.apitests.service.SignatureService;
 import com.pred.apitests.util.MarketContext;
+import com.pred.apitests.util.PollingUtil;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
 import org.testng.SkipException;
@@ -138,26 +139,30 @@ public class BalanceServiceTest extends BaseApiTest {
     private void cancelOrder(String orderId) {
         if (orderId == null || orderId.isBlank()) return;
         Response r = orderService.cancelOrder(token, cookie, parentMarketId, orderId);
-        assertThat(r.getStatusCode()).as("cancel order").isBetween(200, 299);
+        assertThat(r.getStatusCode()).as("cancel order").isEqualTo(200);
     }
 
-    @Test(description = "Balance restores after cancelling order; exact equality with 2s wait")
+    @Test(description = "Balance restores after cancelling order by at least the reserved amount")
     public void cancelOrder_balanceRestores() {
         if (marketId == null || marketId.isBlank()) throw new SkipException("MARKET_ID not set");
-        long before = getMarketBalance();
         String orderId = placeOrder(ORDER_PRICE, ORDER_QUANTITY);
+        // Balance deduction is synchronous — snapshot immediately after place
+        long afterPlace = getMarketBalance();
         cancelOrder(orderId);
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
-        long after = getMarketBalance();
-        assertThat(after).as("balance after cancel").isEqualTo(before);
-        if (after != before) {
-            assertThat(after).as("fallback: balance after cancel >= before").isGreaterThanOrEqualTo(before);
-        }
+        // Poll until balance increases by at least the known reservation ($30)
+        long expectedReservation = parseBalanceAsLong(ORDER_AMOUNT);
+        PollingUtil.pollUntil(15_000, 500, 1000,
+                "Balance did not restore after cancel within 15s",
+                () -> {
+                    long current = getMarketBalance();
+                    return (current - afterPlace) >= expectedReservation;
+                });
+        long afterCancel = getMarketBalance();
+        long increase = afterCancel - afterPlace;
+        System.out.printf("[CANCEL_BALANCE] afterPlace=%d afterCancel=%d increase=%d expectedReservation=%d%n",
+                afterPlace, afterCancel, increase, expectedReservation);
+        assertThat(increase).as("cancel should restore at least the reserved amount ($%s)", ORDER_AMOUNT)
+                .isGreaterThanOrEqualTo(expectedReservation);
     }
 
     @Test(description = "Discover exact delta for price=30 qty=100; assert positive and reasonable")

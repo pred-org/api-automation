@@ -1,25 +1,23 @@
 package com.pred.apitests.service;
 
 import com.pred.apitests.base.BaseService;
-import com.pred.apitests.config.Config;
-import com.pred.apitests.model.request.CashflowDepositRequest;
 import com.pred.apitests.model.request.DepositRequest;
-import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
-import io.restassured.specification.RequestSpecification;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Two-step deposit: (1) internal deposit returns transaction_hash, (2) public cashflow/deposit confirms with that hash.
+ * Two-step deposit: (1) internal deposit returns transaction_hash, (2) internal cashflow confirms with that hash.
  */
 public class DepositService extends BaseService {
 
     /** Internal: POST with ?skip_updating_bs=true to get transaction_hash. */
     private static final String INTERNAL_DEPOSIT_PATH = "/api/v1/competitions/internal/deposit?skip_updating_bs=true";
-    /** Public: POST with Bearer + X-Proxy-Address, body salt + transaction_hash + timestamp. */
-    private static final String CASHFLOW_DEPOSIT_PATH = "/api/v1/cashflow/deposit";
+    /** Internal: POST array body [{user_id, transaction_hash}] to confirm deposit. */
+    private static final String CASHFLOW_INTERNAL_PATH = "/api/v1/cashflow/internal";
 
     /**
      * Step 1: POST {internalBase}/api/v1/competitions/internal/deposit?skip_updating_bs=true
@@ -54,26 +52,19 @@ public class DepositService extends BaseService {
     }
 
     /**
-     * Step 2: POST {publicBase}/api/v1/cashflow/deposit
-     * Headers: Authorization: Bearer, X-Proxy-Address, X-Wallet-Address (EOA)
-     * Body: { "salt": &lt;long&gt;, "transaction_hash": "&lt;from step 1&gt;", "timestamp": &lt;unix&gt; }
+     * Step 2: POST {internalBase}/api/v1/cashflow/internal
+     * Headers: Content-Type: application/json
+     * Body: [ { "user_id": "&lt;userId&gt;", "transaction_hash": "&lt;from step 1&gt;" } ]
      */
-    public Response cashflowDeposit(String accessToken, String proxyAddress, String transactionHash, long salt, long timestamp) {
-        CashflowDepositRequest body = CashflowDepositRequest.builder()
-                .salt(salt)
-                .transactionHash(transactionHash)
-                .timestamp(timestamp)
-                .build();
-        String eoa = TokenManager.getInstance().getEoa();
-        if (eoa == null || eoa.isBlank()) {
-            eoa = Config.getEoaAddress();
-        }
-        RequestSpecification spec = givenWithAuthAndCookie(getPublicBaseUri(), accessToken, null)
-                .header("X-Proxy-Address", proxyAddress);
-        if (eoa != null && !eoa.isBlank()) {
-            spec = spec.header("X-Wallet-Address", eoa);
-        }
-        return spec.body(body).when().post(CASHFLOW_DEPOSIT_PATH).then().extract().response();
+    public Response cashflowDeposit(String userId, String transactionHash) {
+        Map<String, String> item = new HashMap<>();
+        item.put("user_id", userId);
+        item.put("transaction_hash", transactionHash);
+        List<Map<String, String>> body = new ArrayList<>();
+        body.add(item);
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        return post(getInternalBaseUri(), CASHFLOW_INTERNAL_PATH, body, headers);
     }
 
     /**

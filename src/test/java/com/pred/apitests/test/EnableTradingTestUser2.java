@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.config.Config;
 import com.pred.apitests.model.response.PrepareResponse;
+import com.pred.apitests.service.AuthService;
 import com.pred.apitests.service.EnableTradingService;
 import com.pred.apitests.service.SignatureService;
 import com.pred.apitests.util.SecondUserContext;
@@ -106,7 +107,15 @@ public class EnableTradingTestUser2 extends BaseApiTest {
         }
         assertThat(status).as("Enable trading execute for user 2").isEqualTo(200);
 
-        LOG.info("Enable trading complete for user 2 proxy: {}", proxyWallet);
+        // Refresh user 2 token so the new JWT carries is_enabled_trading=true.
+        LOG.info("Enable trading complete for user 2 proxy: {} — refreshing token", proxyWallet);
+        AuthService authService = new AuthService();
+        boolean refreshed = authService.refreshSecondUserAndStore();
+        if (refreshed) {
+            LOG.info("User 2 token refreshed — is_enabled_trading should now be true in JWT");
+        } else {
+            LOG.warn("User 2 token refresh after enable-trading failed — downstream order tests may get 400");
+        }
     }
 
     private static String getTransactionHashFromPrepare(Response prepareResponse) {

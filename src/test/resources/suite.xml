@@ -3,6 +3,8 @@
 <suite name="API Automation Suite" verbose="1" parallel="methods" thread-count="3">
     <listeners>
         <listener class-name="com.pred.apitests.listeners.TestListener"/>
+        <listener class-name="com.pred.apitests.listeners.ExcelTrackerListener"/>
+        <listener class-name="com.pred.apitests.util.RetryListener"/>
         <!-- Slack disabled for debugging; re-enable when ready: -->
       <!-- <listener class-name="com.pred.apitests.listeners.SlackNotificationListener"/>  -->
     </listeners>
@@ -12,15 +14,16 @@
             <class name="com.pred.apitests.LoginTest"/>
         </classes>
     </test>
+    <!-- Auth first; health check that asserts is_enabled_trading runs AFTER Enable Trading (new keys start with trading off). -->
     <test name="Auth Flow" parallel="false">
         <classes>
             <class name="com.pred.apitests.test.AuthFlowTest"/>
-            <class name="com.pred.apitests.HealthCheckTest"/>
         </classes>
     </test>
-    <test name="Enable Trading" parallel="false">
+    <test name="Enable Trading" parallel="false" preserve-order="true">
         <classes>
             <class name="com.pred.apitests.test.EnableTradingTest"/>
+            <class name="com.pred.apitests.HealthCheckTest"/>
         </classes>
     </test>
     <test name="Auth Flow User 2" parallel="false">

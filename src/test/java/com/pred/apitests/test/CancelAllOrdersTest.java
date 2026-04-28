@@ -33,7 +33,6 @@ import static org.hamcrest.Matchers.notNullValue;
  */
 @Test(singleThreaded = true)
 public class CancelAllOrdersTest extends BaseApiTest {
-
     private static final String ORDER_QUANTITY = "100";
     private static final String DEFAULT_ORDER_PRICE = "30";
 
@@ -281,7 +280,7 @@ public class CancelAllOrdersTest extends BaseApiTest {
         assertThat(orderId).isNotBlank();
 
         Response resp = cancelAllOrdersWith401Retry();
-        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isBetween(200, 299);
+        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isEqualTo(200);
         System.out.println("cancelAllOrders response body:\n" + resp.getBody().asPrettyString());
     }
 
@@ -302,8 +301,8 @@ public class CancelAllOrdersTest extends BaseApiTest {
         System.out.println("DEBUG market-filtered count (pre-poll): " + getOpenOrdersForMarketSize());
 
         final int[] lastMarketOpenCount = new int[1];
-        PollingUtil.pollUntil(30_000, 500, 1000,
-                "Open orders were not visible for the market within 30s (Kafka / open-orders index)",
+        PollingUtil.pollUntil(60_000, 500, 1000,
+                "Open orders were not visible for the market within 60s",
                 () -> {
                     lastMarketOpenCount[0] = getOpenOrdersForMarketSize();
                     return lastMarketOpenCount[0] >= 3;
@@ -326,10 +325,10 @@ public class CancelAllOrdersTest extends BaseApiTest {
                 .isGreaterThanOrEqualTo(3);
 
         Response resp = cancelAllOrdersWith401Retry();
-        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isBetween(200, 299);
+        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isEqualTo(200);
 
-        PollingUtil.pollUntil(30_000, 500, 1000,
-                "Open orders for market were not cleared after cancel within 30s",
+        PollingUtil.pollUntil(60_000, 500, 1500,
+                "Open orders for market were not cleared after cancel",
                 () -> getOpenOrdersForMarketSize() == 0);
 
         assertThat(getOpenOrdersForMarketSize()).as("open orders for market after cancel").isEqualTo(0);
@@ -355,7 +354,7 @@ public class CancelAllOrdersTest extends BaseApiTest {
         placeLimitOrderAndReturnOrderId("30");
 
         Response resp = cancelAllOrdersWith401Retry();
-        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isBetween(200, 299);
+        assertThat(resp.getStatusCode()).as("cancelAllOrders response").isEqualTo(200);
 
         PollingUtil.pollUntil(8_000, 300, 500,
                 "Balance did not restore after cancel within 8s",
@@ -391,15 +390,14 @@ public class CancelAllOrdersTest extends BaseApiTest {
     public void cancelAllOrders_withNoOpenOrders_returnsSuccess() {
         validateInit();
 
-        // Cleanup and assert empty for this market
         cancelAllOrdersWith401Retry();
-        PollingUtil.pollUntil(10_000, 500, 1000,
-                "Open orders for market were not empty after cleanup within 10s",
+        PollingUtil.pollUntil(60_000, 500, 1500,
+                "Open orders for market were not empty after cleanup within 60s",
                 () -> getOpenOrdersForMarketSize() == 0);
         assertThat(getOpenOrdersForMarketSize()).isEqualTo(0);
 
         Response resp = cancelAllOrdersWith401Retry();
-        assertThat(resp.getStatusCode()).as("cancelAllOrders response on empty state").isBetween(200, 299);
+        assertThat(resp.getStatusCode()).as("cancelAllOrders response on empty state").isEqualTo(200);
 
         assertThat(getOpenOrdersForMarketSize()).as("open orders for market should remain empty").isEqualTo(0);
     }

@@ -88,6 +88,18 @@
             <version>${allure.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Apache POI for Excel tracker -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+        <!-- Kafka client for event-driven test assertions -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.7.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -100,6 +112,7 @@
                     <suiteXmlFiles>
                         <suiteXmlFile>${suite}</suiteXmlFile>
                     </suiteXmlFiles>
+                    <rerunFailingTestsCount>0</rerunFailingTestsCount>
                     <!-- Single JVM so TokenManager (and .env.session) from AuthFlowTest is visible to later test classes -->
                     <forkCount>0</forkCount>
                     <argLine>--add-opens java.base/java.util.concurrent=ALL-UNNAMED</argLine>
@@ -107,6 +120,55 @@
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
                     <printSummary>true</printSummary>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>sig-server-kill-leftovers</id>
+                        <phase>pre-clean</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>pids="$(lsof -ti tcp:5050 || true)"; if [ -n "$pids" ]; then kill -9 $pids || true; fi</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>sig-server-start-and-wait</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>pids="$(lsof -ti tcp:5050 || true)"; if [ -n "$pids" ]; then kill -9 $pids || true; fi; nohup node "sig-server/signatures/server.js" &gt;/dev/null 2&gt;&amp;1 &amp; for i in $(seq 1 30); do if curl -fsS "http://127.0.0.1:5050/" &gt;/dev/null 2&gt;&amp;1; then exit 0; fi; sleep 1; done; echo "sig-server failed to start on port 5050 within 30s"; exit 1</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>sig-server-stop</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>pids="$(lsof -ti tcp:5050 || true)"; if [ -n "$pids" ]; then kill -9 $pids || true; fi</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>io.qameta.allure</groupId>

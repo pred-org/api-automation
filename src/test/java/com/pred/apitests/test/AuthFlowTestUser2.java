@@ -41,11 +41,12 @@ public class AuthFlowTestUser2 extends BaseApiTest {
         signatureService = new SignatureService();
         apiKey = Config.getSecondUserApiKey();
         if (apiKey == null || apiKey.isBlank()) {
-            throw new SkipException(
-                    "API_KEY_2 not configured. Set API_KEY_2 (or second.user.api.key) in .env to run User 2 tests."
-            );
+            LOG.info("API_KEY_2 not set — creating a new API key for user 2 via internal endpoint");
+            Response keyResponse = authService.createApiKey();
+            assertThat(keyResponse.getStatusCode()).as("createApiKey for user 2").isEqualTo(200);
+            apiKey = authService.parseApiKey(keyResponse);
         }
-        assertThat(apiKey).as("Set API_KEY_2 (or second.user.api.key) for user 2 login when backend allows only one user per key").isNotBlank();
+        assertThat(apiKey).as("API key for user 2 (from config or newly created)").isNotBlank();
 
         SignCreateProxyResponse sigResponse = signatureService.signCreateProxy(Config.getSigServerUrl(), secondPrivateKey);
         assertThat(sigResponse).isNotNull();
@@ -88,9 +89,9 @@ public class AuthFlowTestUser2 extends BaseApiTest {
         if (refreshCookie == null) refreshCookie = "";
         String eoa = sigResponse.getWalletAddress();
 
-        SecondUserContext.clear();
         boolean written = SessionFileWriter.writeSecondUser(token, refreshCookie, userId, proxy, eoa, secondPrivateKey);
         assertThat(written).isTrue();
+        SecondUserContext.clear();
         LOG.info("Second user session written to .env.session2 (userId={}, proxy={})", userId, proxy);
     }
 

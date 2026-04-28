@@ -19,13 +19,30 @@ public final class Config {
 
     static {
         loadEnvFile();
+        clearStaleSessionFiles();
     }
 
     private Config() {}
 
     /** Load .env from project root into system properties so Config getters see them (e.g. SLACK_BOT_TOKEN -> slack.bot.token). */
     private static void loadEnvFile() {
-        Path envPath = Paths.get(System.getProperty("user.dir", ""), ".env");
+        String env = firstNonBlank(System.getProperty("env"), System.getenv("ENV"));
+        Path projectRoot = Paths.get(System.getProperty("user.dir", ""));
+        Path envPath;
+
+        if (env != null && !env.isBlank()) {
+            Path envSpecific = projectRoot.resolve(".env." + env.toLowerCase().trim());
+            if (Files.isRegularFile(envSpecific)) {
+                envPath = envSpecific;
+                System.out.println("[Config] Loading environment: " + env + " from " + envSpecific.getFileName());
+            } else {
+                System.out.println("[Config] WARNING: .env." + env + " not found, falling back to .env");
+                envPath = projectRoot.resolve(".env");
+            }
+        } else {
+            envPath = projectRoot.resolve(".env");
+        }
+
         if (!Files.isRegularFile(envPath)) return;
         try (BufferedReader reader = Files.newBufferedReader(envPath)) {
             String line;
@@ -51,11 +68,61 @@ public final class Config {
                 else if (key.equals("SIG_SERVER_URL")) sysKey = "sig.server.url";
                 else if (key.equals("API_KEY")) sysKey = "api.key";
                 else if (key.equals("API_KEY_2")) sysKey = "second.user.api.key";
+                else if (key.equals("AUTOMATION_FIXTURE_BOOTSTRAP")) sysKey = "automation.fixture.bootstrap";
+                else if (key.equals("AUTOMATION_LEAGUE_ID")) sysKey = "automation.league.id";
+                else if (key.equals("AUTOMATION_CNAME_PREFIX")) sysKey = "automation.cname.prefix";
+                else if (key.equals("AUTOMATION_CNAME_MAX_SCAN")) sysKey = "automation.cname.max.scan";
+                else if (key.equals("AUTOMATION_PARENT_MARKETS")) sysKey = "automation.parent.markets";
+                else if (key.equals("AUTOMATION_TITLE_MARKER")) sysKey = "automation.title.marker";
                 if (System.getProperty(sysKey) == null || System.getProperty(sysKey).isBlank())
                     System.setProperty(sysKey, value);
             }
         } catch (IOException ignored) {
             // .env optional
+        }
+    }
+
+    private static void clearStaleSessionFiles() {
+        Path root = Paths.get(System.getProperty("user.dir", ""));
+        clearIfKeyChanged(root.resolve(".env.session"), System.getProperty("private.key"));
+        clearIfKeyChanged(root.resolve(".env.session2"), System.getProperty("second.user.private.key"));
+    }
+
+    /**
+     * Reads a session file for {@code PRIVATE_KEY=}. If the stored key differs from
+     * {@code currentKey} (from .env), the file is deleted so the next run does a fresh login.
+     * If there is no {@code PRIVATE_KEY=} line, the file is left unchanged (legacy session files
+     * until {@link com.pred.apitests.util.SessionFileWriter#writeFromTokenManager()} overwrites them).
+     */
+    private static void clearIfKeyChanged(Path sessionFile, String currentKey) {
+        if (!Files.isRegularFile(sessionFile)) {
+            return;
+        }
+        if (currentKey == null || currentKey.isBlank()) {
+            return;
+        }
+        try (BufferedReader reader = Files.newBufferedReader(sessionFile)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.startsWith("export ")) {
+                    line = line.substring(7).trim();
+                }
+                if (line.startsWith("PRIVATE_KEY=")) {
+                    String storedKey = line.substring("PRIVATE_KEY=".length()).trim();
+                    if (storedKey.startsWith("\"") && storedKey.endsWith("\"")) {
+                        storedKey = storedKey.substring(1, storedKey.length() - 1);
+                    }
+                    if (!storedKey.isBlank() && !storedKey.equals(currentKey)) {
+                        System.out.println("[Config] Private key changed — deleting stale "
+                                + sessionFile.getFileName());
+                        Files.deleteIfExists(sessionFile);
+                    }
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+            // best-effort
         }
     }
 
@@ -183,6 +250,87 @@ public final class Config {
                 System.getenv("CANONICAL_NAME"),
                 PROPS.getProperty("canonical.name")
         );
+    }
+
+    /**
+     * When true and {@link #getCanonicalName()} is blank, {@code AutomationFixtureBootstrap} can create or reuse
+     * a fixture cname (only-for-automation-1, ...). Env: {@code AUTOMATION_FIXTURE_BOOTSTRAP}, property {@code automation.fixture.bootstrap}.
+     */
+    public static boolean isAutomationFixtureBootstrapEnabled() {
+        return parseTruthy(firstNonBlank(
+                System.getProperty("automation.fixture.bootstrap"),
+                System.getenv("AUTOMATION_FIXTURE_BOOTSTRAP"),
+                PROPS.getProperty("automation.fixture.bootstrap")));
+    }
+
+    /** UAT EPL league id for sports-data matches. Env: {@code AUTOMATION_LEAGUE_ID}. */
+    public static String getAutomationLeagueId() {
+        return firstNonBlank(
+                System.getProperty("automation.league.id"),
+                System.getenv("AUTOMATION_LEAGUE_ID"),
+                PROPS.getProperty("automation.league.id"),
+                "de1bd252-baf5-4417-89ba-77d635f5f8f0");
+    }
+
+    /** Cname prefix for automation fixtures. Default: only-for-automation. */
+    public static String getAutomationCnamePrefix() {
+        return firstNonBlank(
+                System.getProperty("automation.cname.prefix"),
+                System.getenv("AUTOMATION_CNAME_PREFIX"),
+                PROPS.getProperty("automation.cname.prefix"),
+                "only-for-automation");
+    }
+
+    public static int getAutomationCnameMaxScan() {
+        String v = firstNonBlank(
+                System.getProperty("automation.cname.max.scan"),
+                System.getenv("AUTOMATION_CNAME_MAX_SCAN"),
+                PROPS.getProperty("automation.cname.max.scan"));
+        if (v == null || v.isBlank()) {
+            return 30;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(v.trim()));
+        } catch (NumberFormatException e) {
+            return 30;
+        }
+    }
+
+    /**
+     * Comma-separated parent market families for create-fixture, e.g. moneyline,BTTS,totals_1.5
+     * Env: {@code AUTOMATION_PARENT_MARKETS}.
+     */
+    public static String getAutomationParentMarketsSpec() {
+        return firstNonBlank(
+                System.getProperty("automation.parent.markets"),
+                System.getenv("AUTOMATION_PARENT_MARKETS"),
+                PROPS.getProperty("automation.parent.markets"),
+                "moneyline,BTTS,totals_1.5");
+    }
+
+    /**
+     * If set, reusing an existing cname requires a parent or fixture title to contain this marker (case-insensitive), e.g. Automation.
+     * If blank, any successful non-empty discover passes.
+     */
+    public static String getAutomationTitleMarker() {
+        return firstNonBlank(
+                System.getProperty("automation.title.marker"),
+                System.getenv("AUTOMATION_TITLE_MARKER"),
+                PROPS.getProperty("automation.title.marker"));
+    }
+
+    private static boolean parseTruthy(String v) {
+        if (v == null) {
+            return false;
+        }
+        String t = v.trim();
+        if (t.isEmpty()) {
+            return false;
+        }
+        if ("1".equals(t)) {
+            return true;
+        }
+        return "true".equalsIgnoreCase(t) || "yes".equalsIgnoreCase(t);
     }
 
     public static String getTokenId() {

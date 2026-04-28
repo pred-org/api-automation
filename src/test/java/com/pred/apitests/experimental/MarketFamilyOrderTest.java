@@ -1,4 +1,4 @@
-package com.pred.apitests.test;
+package com.pred.apitests.experimental;
 
 import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.config.Config;

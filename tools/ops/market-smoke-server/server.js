@@ -306,6 +306,7 @@ async function placeOrder(publicClient, user, parentMarketIdPath, marketIdBody, 
     reduce_only: false,
     fee_rate_bps: 0,
   };
+  console.log("     FULL PLACE PAYLOAD:", JSON.stringify(body, null, 2));
   const res = await publicClient.post(path, body, {
     headers: {
       ...authHeaders(user),
@@ -611,15 +612,30 @@ app.post("/verify-markets", async (req, res) => {
       }
 
       const elapsed = Date.now() - marketStart;
-      results.push({
-        ...baseResult,
-        status: "success",
-        user1Order: u1Order,
-        user2Order: u2Order,
-        positionCreated,
-        timeTakenMs: elapsed,
-      });
-      passed++;
+      if (positionCreated === true || positionCreated === "not_verified_positions_api_500") {
+        results.push({
+          ...baseResult,
+          status: positionCreated === true ? "success" : "warning",
+          user1Order: u1Order,
+          user2Order: u2Order,
+          positionCreated,
+          timeTakenMs: elapsed,
+        });
+        passed++;
+      } else {
+        failReason = "Orders accepted (202) but no position created — market may not be tradeable";
+        results.push({
+          ...baseResult,
+          status: "failed",
+          error: failReason,
+          user1Order: u1Order,
+          user2Order: u2Order,
+          positionCreated: false,
+          timeTakenMs: elapsed,
+        });
+        failed++;
+        console.log(`     FAILED: ${failReason}`);
+      }
     } catch (err) {
       const elapsed = Date.now() - marketStart;
       const msg = failReason || shortErr(err);

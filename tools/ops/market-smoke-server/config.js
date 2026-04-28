@@ -8,6 +8,6 @@ module.exports = {
   ORDER_PRICE: "30",
   ORDER_QUANTITY: "100",
   PORT: process.env.PORT || 5051,
-  POSITION_CHECK_DELAY_MS: Number(process.env.POSITION_CHECK_DELAY_MS) || 2000,
+  POSITION_CHECK_DELAY_MS: Number(process.env.POSITION_CHECK_DELAY_MS) || 5000,
   HTTP_TIMEOUT_MS: Number(process.env.HTTP_TIMEOUT_MS) || 120000,
 };

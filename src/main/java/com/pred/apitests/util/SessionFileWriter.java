@@ -1,5 +1,7 @@
 package com.pred.apitests.util;
 
+import com.pred.apitests.config.Config;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -7,8 +9,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Writes the current session (access token, refresh cookie, user id, proxy, eoa) to a file
- * so k6 or other tools can source it without copy-paste. File is written to project root as .env.session.
+ * Writes the current session (access token, refresh cookie, user id, proxy, eoa, and private key
+ * when available) to a file so k6 or other tools can source it without copy-paste.
+ * File is written to project root as .env.session. A non-blank {@code export PRIVATE_KEY=...} line
+ * lets {@link com.pred.apitests.config.Config} remove stale session files when {@code PRIVATE_KEY} changes in .env.
  */
 public final class SessionFileWriter {
 
@@ -23,19 +27,42 @@ public final class SessionFileWriter {
      */
     public static boolean writeFromTokenManager() {
         TokenManager tm = TokenManager.getInstance();
-        if (!tm.hasToken()) return false;
+        if (!tm.hasToken()) {
+            return false;
+        }
         String refreshCookie = tm.getRefreshCookieHeaderValue();
         String userId = tm.getUserId();
         String proxy = tm.getProxyWalletAddress();
         String eoa = tm.getEoa();
-        if (userId == null || userId.isBlank() || proxy == null || proxy.isBlank()) return false;
-        return write(tm.getAccessToken(), refreshCookie, userId, proxy, eoa != null ? eoa : "");
+        if (eoa != null) {
+            eoa = eoa.trim();
+        }
+        if (eoa == null) {
+            eoa = "";
+        }
+        // Prefer TokenManager, then .env (Config) — same key Config.clearIfKeyChanged compares against
+        String privateKey = tm.getPrivateKey();
+        if (privateKey == null || privateKey.isBlank()) {
+            privateKey = Config.getPrivateKey();
+        }
+        if (userId == null || userId.isBlank() || proxy == null || proxy.isBlank()) {
+            return false;
+        }
+        return write(tm.getAccessToken(), refreshCookie, userId, proxy, eoa, privateKey);
     }
 
     /**
      * Write session vars to .env.session in project root. Values are shell-safe (quoted, escaped).
      */
     public static boolean write(String accessToken, String refreshCookie, String userId, String proxy, String eoa) {
+        return write(accessToken, refreshCookie, userId, proxy, eoa, null);
+    }
+
+    /**
+     * Write session vars to .env.session. When {@code privateKey} is non-blank, includes {@code export PRIVATE_KEY=...}
+     * so {@link com.pred.apitests.config.Config} can detect stale files after the key changes.
+     */
+    public static boolean write(String accessToken, String refreshCookie, String userId, String proxy, String eoa, String privateKey) {
         if (accessToken == null || accessToken.isBlank() || userId == null || userId.isBlank()
                 || proxy == null || proxy.isBlank()) {
             return false;
@@ -46,6 +73,9 @@ public final class SessionFileWriter {
         String eoaLine = (eoa != null && !eoa.isBlank())
                 ? "export EOA=" + escape(eoa)
                 : "# export EOA not set";
+        String privateKeyLine = (privateKey != null && !privateKey.isBlank())
+                ? "export PRIVATE_KEY=" + escape(privateKey)
+                : "# export PRIVATE_KEY not set";
         String body = ""
                 + "# Session for k6 / shell. Run: source .env.session\n"
                 + "# Generated after login; do not commit.\n"
@@ -53,7 +83,8 @@ public final class SessionFileWriter {
                 + cookieLine + "\n"
                 + "export USER_ID=" + escape(userId) + "\n"
                 + "export PROXY=" + escape(proxy) + "\n"
-                + eoaLine + "\n";
+                + eoaLine + "\n"
+                + privateKeyLine + "\n";
         Path path = Paths.get(System.getProperty("user.dir", ""), FILENAME);
         try {
             Files.writeString(path, body, StandardCharsets.UTF_8);

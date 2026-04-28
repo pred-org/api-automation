@@ -8,6 +8,7 @@ import com.pred.apitests.model.response.SignOrderResponse;
 import com.pred.apitests.service.OrderService;
 import com.pred.apitests.service.SignatureService;
 import com.pred.apitests.util.MarketContext;
+import com.pred.apitests.util.PollingUtil;
 import com.pred.apitests.util.SchemaValidator;
 import com.pred.apitests.util.TokenManager;
 import io.restassured.response.Response;
@@ -114,12 +115,36 @@ public class OrderbookTest extends BaseApiTest {
         int nShares = 5;
 
         boolean placed = placeShortLimitOrderAtPrice(bestBidPrice, String.valueOf(nShares));
-        if (!placed) throw new SkipException("Could not place SHORT order - skip orderbook delta assertion");
+        if (!placed) {
+            throw new SkipException("Could not place SHORT order");
+        }
+
+        final long bidBefore = totalBidBefore;
+        final int expected = nShares;
+        PollingUtil.pollUntil(60_000, 300, 1000,
+                "total_bid_quantity did not decrease by " + nShares,
+                () -> {
+                    Response r = orderService.getOrderbook(parentMarketId, marketId);
+                    if (r.getStatusCode() != 200) {
+                        return false;
+                    }
+                    Object obj = r.path("metadata.total_bid_quantity");
+                    if (obj == null) {
+                        obj = r.path("total_bid_quantity");
+                    }
+                    if (obj == null) {
+                        return false;
+                    }
+                    long after = (long) Double.parseDouble(String.valueOf(obj).trim());
+                    return (bidBefore - after) == expected;
+                });
 
         Response afterRes = orderService.getOrderbook(parentMarketId, marketId);
         assertThat(afterRes.getStatusCode()).isEqualTo(200);
         Object totalBidAfterObj = afterRes.path("metadata.total_bid_quantity");
-        if (totalBidAfterObj == null) totalBidAfterObj = afterRes.path("total_bid_quantity");
+        if (totalBidAfterObj == null) {
+            totalBidAfterObj = afterRes.path("total_bid_quantity");
+        }
         assertThat(totalBidAfterObj).isNotNull();
         long totalBidAfter = (long) Double.parseDouble(String.valueOf(totalBidAfterObj).trim());
         assertThat(totalBidBefore - totalBidAfter).as("total_bid_quantity should decrease by " + nShares + " after SHORT").isEqualTo(nShares);

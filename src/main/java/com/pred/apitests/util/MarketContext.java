@@ -44,7 +44,14 @@ public final class MarketContext {
 
         String cname = Config.getCanonicalName();
         if (cname == null || cname.isBlank()) {
-            throw new IllegalStateException("CANONICAL_NAME not set in .env or system properties");
+            if (Config.isAutomationFixtureBootstrapEnabled()) {
+                AutomationFixtureBootstrap.ensureCanonicalName();
+                cname = Config.getCanonicalName();
+            }
+        }
+        if (cname == null || cname.isBlank()) {
+            throw new IllegalStateException("CANONICAL_NAME not set in .env or system properties "
+                    + "(enable AUTOMATION_FIXTURE_BOOTSTRAP or set CANONICAL_NAME)");
         }
 
         MarketDiscoveryService discoveryService = new MarketDiscoveryService();

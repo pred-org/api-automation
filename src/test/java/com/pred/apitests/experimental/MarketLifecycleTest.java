@@ -1,4 +1,4 @@
-package com.pred.apitests.test;
+package com.pred.apitests.experimental;
 
 import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.config.Config;
@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * WARNING: This test DESTROYS the fixture. Run only on fixtures you are willing to burn.
  * NOT included in suite.xml. Run on-demand:
- *   mvn test -Dtest="AuthFlowTest,AuthFlowTestUser2,MarketLifecycleTest" -Dcanonical.name=your-fixture-cname
+ *   mvn test -Dtest="AuthFlowTest,AuthFlowTestUser2,com.pred.apitests.experimental.MarketLifecycleTest" -Dcanonical.name=your-fixture-cname
  */
 public class MarketLifecycleTest extends BaseApiTest {
 

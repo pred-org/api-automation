@@ -1,4 +1,4 @@
-package com.pred.apitests.test;
+package com.pred.apitests.experimental;
 
 import com.pred.apitests.base.BaseApiTest;
 import com.pred.apitests.service.SettlementService;
@@ -11,7 +11,7 @@ import org.testng.annotations.Test;
  * Standalone utility test: re-submits sports-info resolve for a fixture
  * that already has a manual resolve submission (needs 2nd source for consensus).
  *
- * Run:  mvn test -Dtest=ResolveFixtureTest -DforkCount=0
+ * Run:  mvn test -Dtest=com.pred.apitests.experimental.ResolveFixtureTest -DforkCount=0
  */
 public class ResolveFixtureTest extends BaseApiTest {
 

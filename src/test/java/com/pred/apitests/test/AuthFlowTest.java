@@ -34,9 +34,16 @@ public class AuthFlowTest extends BaseApiTest {
         // Step 1: use API key from config/env, or create if not set
         apiKey = Config.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
-            Response keyResponse = authService.createApiKey();
-            assertThat(keyResponse.getStatusCode()).isEqualTo(200);
-            apiKey = authService.parseApiKey(keyResponse);
+            try {
+                Response keyResponse = authService.createApiKey();
+                assertThat(keyResponse.getStatusCode()).isEqualTo(200);
+                apiKey = authService.parseApiKey(keyResponse);
+            } catch (Exception e) {
+                if (isNoRouteToHost(e)) {
+                    throw new SkipException("Internal API key endpoint unreachable (NoRouteToHost). Provide API_KEY to skip internal createApiKey.");
+                }
+                throw e;
+            }
         }
         assertThat(apiKey).isNotBlank();
 
@@ -90,6 +97,18 @@ public class AuthFlowTest extends BaseApiTest {
         if (SessionFileWriter.writeFromTokenManager()) {
             LOG.info("Session written to .env.session (source it for k6)");
         }
+    }
+
+    private static boolean isNoRouteToHost(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            if (cur instanceof java.net.NoRouteToHostException) return true;
+            if (cur instanceof java.net.UnknownHostException) return true;
+            String msg = cur.getMessage();
+            if (msg != null && msg.toLowerCase().contains("no route to host")) return true;
+            cur = cur.getCause();
+        }
+        return false;
     }
 
     @Test(groups = {"auth-complete"}, description = "Token is stored in TokenManager after login")
@@ -186,7 +205,7 @@ public class AuthFlowTest extends BaseApiTest {
 
         Response response = authService.login(apiKey, badRequest);
         if (response == null) throw new AssertionError("Expected non-null response");
-        assertThat(response.getStatusCode()).as("status code").isGreaterThanOrEqualTo(400).isLessThan(500);
+        assertThat(response.getStatusCode()).as("missing wallet → 400").isEqualTo(400);
         Object err = response.path("error");
         assertThat(err).as("error object").isNotNull();
     }
@@ -215,7 +234,7 @@ public class AuthFlowTest extends BaseApiTest {
 
         Response response = authService.login(apiKey, badRequest);
         if (response == null) throw new AssertionError("Expected non-null response");
-        assertThat(response.getStatusCode()).as("status code").isGreaterThanOrEqualTo(400).isLessThan(500);
+        assertThat(response.getStatusCode()).as("missing signature → 400").isEqualTo(400);
         Object err = response.path("error");
         assertThat(err).as("error object").isNotNull();
     }
@@ -225,7 +244,7 @@ public class AuthFlowTest extends BaseApiTest {
         String invalidCookie = "refresh_token=invalid-garbage-token-12345";
         Response response = authService.refreshToken(invalidCookie);
         if (response == null) throw new AssertionError("Expected non-null response");
-        assertThat(response.getStatusCode()).as("status code").isGreaterThanOrEqualTo(400).isLessThan(500);
+        assertThat(response.getStatusCode()).as("invalid refresh cookie → 401").isEqualTo(401);
         Object err = response.path("error");
         assertThat(err).as("error object").isNotNull();
     }
@@ -254,7 +273,7 @@ public class AuthFlowTest extends BaseApiTest {
         // AuthService would set the header; avoid null to prevent NPE, use empty string instead.
         Response response = authService.login("", loginRequest);
         if (response == null) throw new AssertionError("Expected non-null response");
-        assertThat(response.getStatusCode()).as("status code").isGreaterThanOrEqualTo(400).isLessThan(500);
+        assertThat(response.getStatusCode()).as("missing API key → 401").isEqualTo(401);
         Object err = response.path("error");
         assertThat(err).as("error object").isNotNull();
     }
@@ -282,7 +301,7 @@ public class AuthFlowTest extends BaseApiTest {
 
         Response response = authService.login("invalid-api-key-xyz-000", loginRequest);
         if (response == null) throw new AssertionError("Expected non-null response");
-        assertThat(response.getStatusCode()).as("status code").isGreaterThanOrEqualTo(400).isLessThan(500);
+        assertThat(response.getStatusCode()).as("invalid API key → 401").isEqualTo(401);
         Object err = response.path("error");
         assertThat(err).as("error object").isNotNull();
     }
@@ -307,9 +326,7 @@ public class AuthFlowTest extends BaseApiTest {
                 .timestamp(System.currentTimeMillis() / 1000)
                 .build();
         Response response = svc.login(key, badRequest);
-        assertThat(response.getStatusCode())
-                .isGreaterThanOrEqualTo(400)
-                .isLessThan(500);
+        assertThat(response.getStatusCode()).as("invalid signature → 401").isEqualTo(401);
         response.then().body("error", notNullValue())
                 .body("error.status_code", equalTo(401))
                 .body("error.error_code", equalTo("SIGNATURE_LOGIN_FAILED"))

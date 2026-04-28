@@ -119,7 +119,11 @@ public class MarketDiscoveryTest extends BaseApiTest {
             List<?> list = response.jsonPath().getList("data.parent_markets_list");
             assertThat(list == null || list.isEmpty()).isTrue();
         } else {
-            assertThat(response.getStatusCode()).isIn(404, 400, 500);
+            int sc = response.getStatusCode();
+            if (sc == 500) {
+                System.out.println("[WARN] Backend returned 500 for invalid cname — should be 404 (known backend issue)");
+            }
+            assertThat(sc).as("invalid cname should return 404 or 500 (backend bug)").isIn(404, 500);
         }
     }
 }

@@ -22,6 +22,7 @@ logs/
 .env.local
 .env.session
 .env.session2
+.env.tracker
 .env.*.local
 tools/scripts/set_env.sh
 
@@ -66,3 +67,15 @@ tools/scripts/output/
 # Scratch / demo files (local reference)
 2
 without-framwork.java
+
+# Internal docs
+docs/NOTION_TASKS.md
+docs/OBJECTIVES_AND_ALIGNMENT.md
+docs/GAPS-AND-ROADMAP.md
+docs/SESSION-HELPER.md
+docs/AUTOMATION-WALKTHROUGH.md
+docs/FILE-BY-FILE-INVENTORY.md
+docs/FRAMEWORK.md
+docs/DOCS-INDEX.md
+docs/TESTCASES-COVERED.md
+docs/flow.md
