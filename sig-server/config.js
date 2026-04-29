@@ -3,6 +3,11 @@
  * PROXY and USER_ID come from login response.
  * Env from project-root .env (loaded by signatures/server.js) or process.env; config defaults below.
  *
+ * Load-testing wallets (signatures/server.js):
+ * - SIG_SERVER_EXPOSE_SECRETS — set to "true" only if you need legacy behaviour (generated private_key in JSON).
+ *   Default is off: use POST /wallets + signing_id on sign-create-proxy / sign-order / sign-safe-approval.
+ * - SIG_SERVER_MAX_WALLET_BATCH — cap for POST /wallets/batch (default 5000).
+ *
  * Java tests: They send privateKey in the request body to POST /sign-create-proxy and POST /sign-order.
  * The sig-server derives the wallet address from that key and does NOT use EOA_ADDRESS for those requests.
  * So changing EOA_ADDRESS here does not affect the tests; the tests use the address derived from

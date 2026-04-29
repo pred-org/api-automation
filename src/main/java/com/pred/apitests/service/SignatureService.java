@@ -22,13 +22,22 @@ public class SignatureService extends BaseService {
 
     /**
      * POST {sigServerUrl}/sign-create-proxy
-     * Body: { "privateKey": "<privateKey>" } or {} if privateKey is null/blank.
+     * Body: {@code privateKey} and/or {@code signing_id} (wallet registered via POST /wallets on sig-server).
+     * Omit both to let sig-server allocate a new in-process wallet (returns {@code signing_id}).
      */
     public SignCreateProxyResponse signCreateProxy(String sigServerUrl, String privateKey) {
-        Object body = (privateKey != null && !privateKey.isBlank())
-                ? Map.of("privateKey", privateKey)
-                : Collections.emptyMap();
-        Response response = post(sigServerUrl, SIGN_CREATE_PROXY_PATH, body);
+        return signCreateProxy(sigServerUrl, privateKey, null);
+    }
+
+    public SignCreateProxyResponse signCreateProxy(String sigServerUrl, String privateKey, String signingId) {
+        Map<String, Object> body = new HashMap<>();
+        if (signingId != null && !signingId.isBlank()) {
+            body.put("signing_id", signingId);
+        }
+        if (privateKey != null && !privateKey.isBlank()) {
+            body.put("privateKey", privateKey);
+        }
+        Response response = post(sigServerUrl, SIGN_CREATE_PROXY_PATH, body.isEmpty() ? Collections.emptyMap() : body);
         return response.as(SignCreateProxyResponse.class);
     }
 
@@ -52,9 +61,19 @@ public class SignatureService extends BaseService {
     }
 
     public SignSafeApprovalResponse signSafeApproval(String sigServerUrl, String transactionHash, String privateKey) {
+        return signSafeApproval(sigServerUrl, transactionHash, privateKey, null);
+    }
+
+    /**
+     * Same as {@link #signSafeApproval(String, String, String)} but uses a wallet registered on sig-server ({@code signing_id}).
+     */
+    public SignSafeApprovalResponse signSafeApproval(String sigServerUrl, String transactionHash, String privateKey, String signingId) {
         Map<String, Object> body = new HashMap<>();
         body.put("transactionHash", transactionHash);
         body.put("usePersonalSign", false);
+        if (signingId != null && !signingId.isBlank()) {
+            body.put("signing_id", signingId);
+        }
         if (privateKey != null && !privateKey.isBlank()) {
             body.put("privateKey", privateKey);
         }

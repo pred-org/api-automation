@@ -5,10 +5,45 @@ const express = require("express");
 const cors = require("cors");
 const { ethers } = require("ethers");
 const config = require("../config");
+const { WalletRegistry, normalizePrivateKey } = require("../wallet-registry");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+/** Opaque in-process wallets for load tests (see POST /wallets, signing_id on sign-*). */
+const walletRegistry = new WalletRegistry();
+
+/** If true, newly generated keys may be returned in JSON (legacy / local only). Default false. */
+function exposeGeneratedSecrets() {
+  return process.env.SIG_SERVER_EXPOSE_SECRETS === "true" || process.env.SIG_SERVER_EXPOSE_SECRETS === "1";
+}
+
+const MAX_WALLET_BATCH = Math.min(
+  Math.max(parseInt(process.env.SIG_SERVER_MAX_WALLET_BATCH || "5000", 10) || 5000, 1),
+  100000
+);
+
+function resolveWalletFromBody(body, fallbackWallet) {
+  if (!body || typeof body !== "object") return fallbackWallet || null;
+  if (body.signingId && typeof body.signingId === "string") {
+    const w = walletRegistry.getWallet(body.signingId.trim());
+    if (w) return w;
+  }
+  if (body.signing_id && typeof body.signing_id === "string") {
+    const w = walletRegistry.getWallet(body.signing_id.trim());
+    if (w) return w;
+  }
+  try {
+    if (body.privateKey && String(body.privateKey).trim()) {
+      const pk = normalizePrivateKey(body.privateKey);
+      return new ethers.Wallet(pk);
+    }
+  } catch (_) {
+    return null;
+  }
+  return fallbackWallet || null;
+}
 
 // Optional: multi-user config for 5 users with different keys/order params
 let multiUserConfig = null;
@@ -30,11 +65,13 @@ try {
 // Health check + list endpoints (verify correct server is running)
 app.get("/", (req, res) => {
   const endpoints = [
-    "POST /sign-order",
-    "POST /sign-order-multi (body: userIndex, salt, price, quantity, questionId, feeRateBps, intent, maker, priceInCents)",
-    "POST /sign-create-proxy",
+    "POST /wallets (body: optional privateKey — register; omit for random)",
+    "POST /wallets/batch (body: { count } or { private_keys: [...] })",
+    "POST /sign-order (body: signingId | signing_id | privateKey | default config wallet)",
+    "POST /sign-order-multi (body: userIndex, ...)",
+    "POST /sign-create-proxy (body: signingId | privateKey | empty for new registered wallet)",
     "POST /sign-create-proxy-mm",
-    "POST /sign-safe-approval",
+    "POST /sign-safe-approval (body: signingId | privateKey | default wallet)",
     "GET /mm-info",
   ];
   res.json({
@@ -42,6 +79,8 @@ app.get("/", (req, res) => {
     service: "pred-load-tests sig-server",
     endpoints,
     multi_user: !!multiUserConfig,
+    registered_wallets: walletRegistry.size,
+    expose_secrets: exposeGeneratedSecrets(),
   });
 });
 
@@ -111,13 +150,79 @@ const createProxyMessage = {
   paymentReceiver: "0x0000000000000000000000000000000000000000",
 };
 
-// SIGNATURE 3: EIP-712 Order — for place-order API only. See docs/SIGNATURES.md
-// If body.privateKey is provided, use it for this request (so Java can pass env PRIVATE_KEY and match login EOA).
-app.post("/sign-order", async (req, res) => {
-  const signerWallet = req.body.privateKey ? new ethers.Wallet(req.body.privateKey) : wallet;
-  if (!signerWallet) return res.status(503).json({ error: "PRIVATE_KEY not configured: set in sig-server config or send privateKey in body" });
+// --- Wallet provisioning (load tests): register keys once, then pass signing_id only ---
+app.post("/wallets", (req, res) => {
   try {
-const { salt, price, quantity, questionId, feeRateBps, intent, maker: bodyMaker, signer: bodySigner, priceInCents } = req.body;
+    const pk = req.body && req.body.privateKey;
+    if (pk && String(pk).trim()) {
+      const { signingId, address } = walletRegistry.registerPrivateKey(pk);
+      return res.json({ ok: true, signing_id: signingId, address });
+    }
+    const created = walletRegistry.registerRandom();
+    const out = { ok: true, signing_id: created.signingId, address: created.address };
+    if (exposeGeneratedSecrets()) {
+      out.private_key = created.wallet.privateKey;
+    }
+    return res.json(out);
+  } catch (e) {
+    return res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+app.post("/wallets/batch", (req, res) => {
+  try {
+    const body = req.body || {};
+    const rawList = body.private_keys || body.privateKeys;
+    if (Array.isArray(rawList)) {
+      if (rawList.length > MAX_WALLET_BATCH) {
+        return res.status(400).json({ error: `private_keys length exceeds max (${MAX_WALLET_BATCH})` });
+      }
+      const wallets = [];
+      for (const k of rawList) {
+        wallets.push(walletRegistry.registerPrivateKey(k));
+      }
+      return res.json({
+        ok: true,
+        count: wallets.length,
+        wallets: wallets.map((w) => ({ signing_id: w.signingId, address: w.address })),
+      });
+    }
+    const n = parseInt(body.count, 10);
+    if (Number.isNaN(n) || n < 1) {
+      return res.status(400).json({
+        error: "expected body { count: number } or { private_keys: [ hex ... ] }",
+      });
+    }
+    if (n > MAX_WALLET_BATCH) {
+      return res.status(400).json({ error: `count exceeds max (${MAX_WALLET_BATCH})` });
+    }
+    const wallets = [];
+    for (let i = 0; i < n; i++) {
+      const row = walletRegistry.registerRandom();
+      const item = { signing_id: row.signingId, address: row.address };
+      if (exposeGeneratedSecrets()) {
+        item.private_key = row.wallet.privateKey;
+      }
+      wallets.push(item);
+    }
+    return res.json({ ok: true, count: wallets.length, wallets });
+  } catch (e) {
+    return res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+// SIGNATURE 3: EIP-712 Order — for place-order API only. See docs/SIGNATURES.md
+// Prefer signing_id (registered wallet); else body.privateKey; else config PRIVATE_KEY.
+app.post("/sign-order", async (req, res) => {
+  const signerWallet = resolveWalletFromBody(req.body, wallet);
+  if (!signerWallet) {
+    return res.status(503).json({
+      error:
+        "No signer: set PRIVATE_KEY in config, or POST /wallets and pass signing_id, or send privateKey in body",
+    });
+  }
+  try {
+    const { salt, price, quantity, questionId, feeRateBps, intent, maker: bodyMaker, signer: bodySigner, priceInCents } = req.body;
   const signerEoa = signerWallet.address;
 
     // Backend expects maker = proxy (trading contract), signer = EOA that signs (must match recovered address)
@@ -240,28 +345,56 @@ app.post("/sign-create-proxy-mm", async (req, res) => {
   }
 });
 
-// New endpoint for CreateProxy EIP-712 signature (for login)
+// CreateProxy EIP-712 signature (login). Use signing_id from POST /wallets to avoid passing private keys.
 app.post("/sign-create-proxy", async (req, res) => {
   try {
-    // Create a new wallet for each request (or use provided private key)
-    const { privateKey } = req.body;
-    const signerWallet = privateKey
-      ? new ethers.Wallet(privateKey)
-      : ethers.Wallet.createRandom();
+    const body = req.body || {};
+    const sidIn =
+      (body.signingId && String(body.signingId).trim()) ||
+      (body.signing_id && String(body.signing_id).trim()) ||
+      "";
+    const hasPk = body.privateKey && String(body.privateKey).trim();
 
-    // Sign the CreateProxy message using EIP-712
+    let signerWallet;
+    let signingIdOut = null;
+    let generatedEphemeral = false;
+
+    if (sidIn) {
+      signerWallet = walletRegistry.getWallet(sidIn);
+      if (!signerWallet) {
+        return res.status(400).json({ error: "unknown signing_id" });
+      }
+      signingIdOut = sidIn;
+    } else if (hasPk) {
+      const pk = normalizePrivateKey(body.privateKey);
+      signerWallet = new ethers.Wallet(pk);
+    } else {
+      const created = walletRegistry.registerRandom();
+      signerWallet = created.wallet;
+      signingIdOut = created.signingId;
+      generatedEphemeral = true;
+    }
+
     const signature = await signerWallet.signTypedData(
       createProxyDomain,
       createProxyTypes,
       createProxyMessage
     );
 
-    return res.json({
+    const out = {
       ok: true,
       wallet_address: signerWallet.address,
-      signature: signature,
-      private_key: signerWallet.privateKey, // Return private key for testing purposes
-    });
+      signature,
+    };
+    if (signingIdOut) {
+      out.signing_id = signingIdOut;
+    }
+    // Never echo a client-supplied private key. Optionally return generated keys for legacy scripts.
+    if (generatedEphemeral && exposeGeneratedSecrets()) {
+      out.private_key = signerWallet.privateKey;
+    }
+
+    return res.json(out);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -269,8 +402,13 @@ app.post("/sign-create-proxy", async (req, res) => {
 
 // SIGNATURE 2: EIP-1193 — sign transactionHash for safe-approval/execute only. body: transactionHash, usePersonalSign (optional). See docs/SIGNATURES.md
 app.post("/sign-safe-approval", async (req, res) => {
-  const signerWallet = req.body.privateKey ? new ethers.Wallet(req.body.privateKey) : wallet;
-  if (!signerWallet) return res.status(503).json({ error: "PRIVATE_KEY not configured in sig-server/config.js" });
+  const signerWallet = resolveWalletFromBody(req.body, wallet);
+  if (!signerWallet) {
+    return res.status(503).json({
+      error:
+        "No signer: set PRIVATE_KEY in sig-server config, or pass signing_id / privateKey in body",
+    });
+  }
   try {
     const { transactionHash, usePersonalSign } = req.body;
     if (!transactionHash) {
@@ -306,12 +444,18 @@ app.get("/mm-info", (req, res) => {
 
 const server = app.listen(5050, () => {
   console.log("Signature server running at http://localhost:5050/");
-  console.log("Market Maker EOA:", eoaAddress);
+  console.log("Market Maker EOA:", eoaAddress || "(none)");
   if (config.EOA_ADDRESS) {
     console.log("(Using provided EOA address)");
-  } else {
+  } else if (wallet) {
     console.log("(Derived from private key:", wallet.address + ")");
+  } else {
+    console.log("(No default PRIVATE_KEY — use POST /wallets + signing_id on sign-* endpoints)");
   }
+  console.log(
+    "SIG_SERVER_EXPOSE_SECRETS=",
+    exposeGeneratedSecrets() ? "on (generated keys may appear in JSON)" : "off (recommended)"
+  );
   console.log("Test: curl http://localhost:5050/");
 });
 

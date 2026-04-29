@@ -16,6 +16,10 @@ public class SignCreateProxyResponse {
     @JsonProperty("private_key")
     private String privateKey;
 
+    /** Opaque id from sig-server when the wallet is registered in-process (POST /wallets). */
+    @JsonProperty("signing_id")
+    private String signingId;
+
     public boolean isOk() { return ok; }
     public void setOk(boolean ok) { this.ok = ok; }
     public String getWalletAddress() { return walletAddress; }
@@ -24,4 +28,6 @@ public class SignCreateProxyResponse {
     public void setSignature(String signature) { this.signature = signature; }
     public String getPrivateKey() { return privateKey; }
     public void setPrivateKey(String privateKey) { this.privateKey = privateKey; }
+    public String getSigningId() { return signingId; }
+    public void setSigningId(String signingId) { this.signingId = signingId; }
 }

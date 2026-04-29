@@ -3,13 +3,16 @@ const config = require("../config");
 
 console.log("Verifying sig-server config");
 
-if (!config.PRIVATE_KEY) {
-  console.error("PRIVATE_KEY is empty. Set it in sig-server/config.js or env PRIVATE_KEY.");
-  process.exit(1);
+let derivedAddress = "(n/a)";
+let wallet = null;
+if (config.PRIVATE_KEY) {
+  wallet = new ethers.Wallet(config.PRIVATE_KEY);
+  derivedAddress = wallet.address;
+} else {
+  console.warn(
+    "PRIVATE_KEY is empty — fine for load tests using POST /wallets + signing_id; scripts that need a default MM wallet should set PRIVATE_KEY."
+  );
 }
-
-const wallet = new ethers.Wallet(config.PRIVATE_KEY);
-const derivedAddress = wallet.address;
 
 console.log("Config:");
 console.log("   PRIVATE_KEY: " + (config.PRIVATE_KEY ? "(set)" : "(not set)"));

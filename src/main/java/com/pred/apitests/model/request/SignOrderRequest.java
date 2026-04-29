@@ -42,6 +42,10 @@ public class SignOrderRequest {
     @JsonProperty("privateKey")
     private String privateKey;
 
+    /** Use instead of privateKey when keys are registered on sig-server (POST /wallets). */
+    @JsonProperty("signingId")
+    private String signingId;
+
     public String getSalt() { return salt; }
     public void setSalt(String salt) { this.salt = salt; }
     public String getPrice() { return price; }
@@ -72,6 +76,8 @@ public class SignOrderRequest {
     public void setTimestamp(Long timestamp) { this.timestamp = timestamp; }
     public String getPrivateKey() { return privateKey; }
     public void setPrivateKey(String privateKey) { this.privateKey = privateKey; }
+    public String getSigningId() { return signingId; }
+    public void setSigningId(String signingId) { this.signingId = signingId; }
 
     public static Builder builder() {
         return new Builder();
@@ -95,6 +101,7 @@ public class SignOrderRequest {
         public Builder priceInCents(Boolean priceInCents) { o.priceInCents = priceInCents; return this; }
         public Builder timestamp(Long timestamp) { o.timestamp = timestamp; return this; }
         public Builder privateKey(String privateKey) { o.privateKey = privateKey; return this; }
+        public Builder signingId(String signingId) { o.signingId = signingId; return this; }
         public SignOrderRequest build() { return o; }
     }
 }
